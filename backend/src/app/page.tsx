@@ -37,10 +37,16 @@ export default function HomePage() {
               Next.js 15 Serverless REST API with Prisma ORM &amp; Neon PostgreSQL (Vercel-ready)
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <span style={{ backgroundColor: '#10b98120', color: '#34d399', padding: '6px 12px', borderRadius: '9999px', fontSize: '13px', fontWeight: 600 }}>
               ● Operational
             </span>
+            <a
+              href="/api/docs"
+              style={{ backgroundColor: '#35104f', border: '1px solid #e6388c', color: '#ffffff', padding: '6px 14px', borderRadius: '6px', fontSize: '13px', textDecoration: 'none', fontWeight: 600 }}
+            >
+              Interactive Swagger Docs (/api/docs) ↗
+            </a>
             <a
               href="/api/health"
               target="_blank"

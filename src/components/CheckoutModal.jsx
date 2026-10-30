@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { X, CheckCircle, ShieldCheck, CreditCard, Banknote, Smartphone, ArrowRight, Printer } from 'lucide-react';
 
 export default function CheckoutModal({ isOpen, onClose, cart, user, onOrderSuccess }) {
@@ -126,7 +126,7 @@ export default function CheckoutModal({ isOpen, onClose, cart, user, onOrderSucc
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#eadde8] bg-gradient-to-r from-[#35104f] to-[#4a166e] text-white">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-[#e6388c] animate-pulse" />
-            <h2 className="text-lg font-semibold tracking-wide">
+            <h2 className="text-lg font-serif italic font-bold tracking-wide text-white">
               {step === 'details' && 'Secure Checkout — Shipping Details'}
               {step === 'payment' && 'Select Payment Gateway'}
               {step === 'confirmed' && 'Order Confirmed! Thank You'}
@@ -242,6 +242,19 @@ export default function CheckoutModal({ isOpen, onClose, cart, user, onOrderSucc
                     <span className="text-xs font-bold text-[#35104f]">৳120 (3-5 days)</span>
                   </label>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[#35104f] mb-1">
+                  Order Notes (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Special delivery instructions, gate code, timing..."
+                  className="w-full px-3.5 py-2 border border-[#eadde8] rounded-lg focus:border-[#e6388c] focus:outline-none text-sm"
+                />
               </div>
 
               {/* Promo code voucher */}

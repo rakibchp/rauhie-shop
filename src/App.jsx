@@ -1,12 +1,15 @@
-import { Accessibility, ArrowDownUp, Eye, History as HistoryIcon, LogOut, Search, Star, UserRound, X, ShoppingBag, ShieldCheck, Check } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Accessibility, ArrowDownUp, Eye, History as HistoryIcon, LogOut, Search, Star, UserRound, X, ShieldCheck, Sparkles, Menu, Check, ShoppingBag } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import './App.css';
 import brandLogo from './assets/logo.png';
 import CheckoutModal from './components/CheckoutModal.jsx';
 import SuperAdminDashboard from './components/SuperAdminDashboard.jsx';
 import OrderHistoryView from './components/OrderHistoryView.jsx';
 import Toast from './components/Toast.jsx';
+import AIGiftAdvisorModal from './components/AIGiftAdvisorModal.jsx';
+import AIStyleMatchModal from './components/AIStyleMatchModal.jsx';
+import AISmartSearchModal from './components/AISmartSearchModal.jsx';
 import { api, INITIAL_PRODUCTS, INITIAL_CATEGORIES } from './services/api.js';
 
 function formatPrice(price) {
@@ -127,78 +130,322 @@ function AccessibilityControls() {
   );
 }
 
-function Header({ itemCount, session, onOpenAdmin }) {
+function Header({ itemCount, session, onOpenAdmin, onOpenGiftAdvisor, onOpenSmartSearch }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isAdmin = session?.user?.role === 'ADMIN';
 
   return (
-    <header className="site-header sticky top-0 z-40 bg-[#fffbfd]/95 backdrop-blur-md shadow-xs">
-      <div className="header-inner">
-        <Link className="wordmark" to="/" aria-label="Rauhie Shop home">
-          <img className="brand-logo" src={brandLogo} alt="Rauhie Shop Logo" />
-          <span>Rauhie Shop</span>
-        </Link>
-        <nav className="main-nav" aria-label="Main navigation">
-          <NavLink to="/" end>Shop</NavLink>
-          <a href="/#new-arrivals">New arrivals</a>
-          <NavLink to="/history">Orders</NavLink>
-          <NavLink to="/about">About</NavLink>
-          <NavLink to="/contact">Contact</NavLink>
+    <header className="site-header sticky top-0 z-40 bg-[#fffbfd]/95 backdrop-blur-md border-b border-[#eadde8]/80 shadow-xs">
+      <div className="header-inner max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-4">
+        {/* Left: Brand Logo & Wordmark */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="lg:hidden p-2 -ml-2 text-[#35104f] hover:text-[#e6388c] transition cursor-pointer"
+            aria-label="Toggle navigation menu"
+          >
+            {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+
+          <Link className="flex items-center gap-2.5 group" to="/" aria-label="Rauhie Shop home">
+            <img className="w-10 h-10 sm:w-11 sm:h-11 rounded-full object-contain ring-2 ring-[#e6388c]/20 group-hover:ring-[#e6388c] transition" src={brandLogo} alt="Rauhie Shop Logo" />
+            <div className="flex flex-col">
+              <span className="brand-title-gradient text-base sm:text-xl tracking-tight leading-none group-hover:opacity-90 transition-opacity">
+                Rauhie Shop
+              </span>
+              <span className="text-[10px] uppercase font-semibold tracking-widest text-[#e6388c] mt-0.5">
+                Luxury &amp; Gifts
+              </span>
+            </div>
+          </Link>
+        </div>
+
+        {/* Center: Desktop Navigation */}
+        <nav className="hidden lg:flex items-center gap-5 xl:gap-8" aria-label="Main navigation">
+          <NavLink to="/" end className={({ isActive }) => `text-xs font-semibold uppercase tracking-wider transition ${isActive ? 'text-[#e6388c] border-b-2 border-[#e6388c] pb-1' : 'text-[#35104f]/80 hover:text-[#e6388c]'}`}>
+            Collection
+          </NavLink>
+          <a href="/#new-arrivals" className="text-xs font-semibold uppercase tracking-wider text-[#35104f]/80 hover:text-[#e6388c] transition">
+            New Arrivals
+          </a>
+          <NavLink to="/history" className={({ isActive }) => `text-xs font-semibold uppercase tracking-wider transition ${isActive ? 'text-[#e6388c] border-b-2 border-[#e6388c] pb-1' : 'text-[#35104f]/80 hover:text-[#e6388c]'}`}>
+            Track Orders
+          </NavLink>
+          <NavLink to="/about" className={({ isActive }) => `text-xs font-semibold uppercase tracking-wider transition ${isActive ? 'text-[#e6388c] border-b-2 border-[#e6388c] pb-1' : 'text-[#35104f]/80 hover:text-[#e6388c]'}`}>
+            Our Heritage
+          </NavLink>
+          <NavLink to="/contact" className={({ isActive }) => `text-xs font-semibold uppercase tracking-wider transition ${isActive ? 'text-[#e6388c] border-b-2 border-[#e6388c] pb-1' : 'text-[#35104f]/80 hover:text-[#e6388c]'}`}>
+            Concierge
+          </NavLink>
           {isAdmin ? (
-            <NavLink to="/admin" className="text-[#e6388c] font-bold">
+            <NavLink to="/admin" className="text-xs font-bold uppercase tracking-wider text-[#e6388c] bg-pink-50 px-2.5 py-1 rounded-full border border-pink-200">
               ★ SuperAdmin
             </NavLink>
           ) : (
             <button
               onClick={onOpenAdmin}
               type="button"
-              className="text-[11px] font-semibold text-[#e6388c] hover:underline cursor-pointer"
+              className="text-xs font-semibold uppercase tracking-wider text-slate-500 hover:text-[#e6388c] transition cursor-pointer"
             >
               Admin Portal
             </button>
           )}
         </nav>
-        <div className="header-actions">
+
+        {/* Right: Actions */}
+        <div className="flex items-center gap-1.5 sm:gap-3">
+          {/* AI Smart Search trigger button */}
+          <button
+            type="button"
+            onClick={onOpenSmartSearch}
+            className="p-2 text-[#35104f] hover:text-[#e6388c] hover:bg-[#faf5f9] rounded-xl transition cursor-pointer flex items-center gap-1.5 text-xs font-medium"
+            title="AI Smart Search"
+            aria-label="Open AI smart search"
+          >
+            <Search size={18} />
+            <span className="hidden xl:inline text-xs font-medium text-slate-600">Smart Search</span>
+          </button>
+
+          {/* AI Gift Concierge Trigger Button */}
+          <button
+            type="button"
+            onClick={onOpenGiftAdvisor}
+            className="hidden sm:flex relative px-3 py-1.5 bg-gradient-to-r from-[#35104f] to-[#e6388c] text-white text-xs font-semibold rounded-xl shadow-xs hover:opacity-95 transition cursor-pointer items-center gap-1.5"
+            aria-label="Open AI Gift Concierge"
+          >
+            <Sparkles size={14} className="text-pink-200 animate-pulse" />
+            <span className="hidden md:inline">AI Gift Concierge</span>
+            <span className="md:hidden">AI Gifts</span>
+          </button>
+
           <AccessibilityControls />
-          <NavLink className="account-nav-link" to={session ? '/account' : '/login'}>
-            <UserRound size={14} aria-hidden="true" />
-            <span>{session ? (session.user?.name || 'Account') : 'Sign in'}</span>
+
+          {/* User Account */}
+          <NavLink
+            className="p-2 text-[#35104f] hover:text-[#e6388c] hover:bg-[#faf5f9] rounded-xl transition flex items-center gap-1.5 text-xs font-semibold"
+            to={session ? '/account' : '/login'}
+            aria-label={session ? 'My Account' : 'Sign In'}
+          >
+            <UserRound size={17} aria-hidden="true" />
+            <span className="hidden lg:inline text-xs">{session ? (session.user?.name?.split(' ')[0] || 'Account') : 'Sign In'}</span>
           </NavLink>
-          <Link className="bag-link" to="/cart" aria-label={`Shopping bag, ${itemCount} items`}>
-            Bag <span className="bag-count">{itemCount}</span>
+
+          {/* Shopping Bag with Badge */}
+          <Link
+            className="relative p-2 text-[#35104f] hover:text-[#e6388c] hover:bg-[#faf5f9] rounded-xl transition flex items-center gap-1.5 text-xs font-semibold"
+            to="/cart"
+            aria-label={`Shopping bag, ${itemCount} items`}
+          >
+            <ShoppingBag size={18} aria-hidden="true" />
+            <span className="hidden sm:inline text-xs font-bold">Bag</span>
+            <span className="w-5 h-5 rounded-full bg-[#e6388c] text-white text-[10px] font-bold flex items-center justify-center">
+              {itemCount}
+            </span>
           </Link>
         </div>
       </div>
+
+      {/* Mobile Drawer Navigation */}
+      {mobileMenuOpen && (
+        <div className="lg:hidden bg-white border-b border-[#eadde8] px-5 py-4 space-y-3 animate-fade-in shadow-xl">
+          <div className="grid grid-cols-2 gap-2 pb-3 border-b border-slate-100">
+            <button
+              onClick={() => {
+                onOpenGiftAdvisor();
+                setMobileMenuOpen(false);
+              }}
+              type="button"
+              className="py-2.5 px-3 bg-gradient-to-r from-[#35104f] to-[#e6388c] text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <Sparkles size={13} className="text-pink-200" /> AI Gift Concierge
+            </button>
+            <button
+              onClick={() => {
+                onOpenSmartSearch();
+                setMobileMenuOpen(false);
+              }}
+              type="button"
+              className="py-2.5 px-3 bg-[#faf5f9] text-[#35104f] border border-[#eadde8] rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <Search size={13} className="text-[#e6388c]" /> Smart Search
+            </button>
+          </div>
+
+          <div className="flex flex-col space-y-2 text-sm font-semibold text-[#35104f]">
+            <NavLink to="/" onClick={() => setMobileMenuOpen(false)} className="py-2 hover:text-[#e6388c] border-b border-slate-50">
+              Shop All Collections
+            </NavLink>
+            <NavLink to="/history" onClick={() => setMobileMenuOpen(false)} className="py-2 hover:text-[#e6388c] border-b border-slate-50">
+              Track Customer Orders
+            </NavLink>
+            <NavLink to="/about" onClick={() => setMobileMenuOpen(false)} className="py-2 hover:text-[#e6388c] border-b border-slate-50">
+              About Rauhie Heritage
+            </NavLink>
+            <NavLink to="/contact" onClick={() => setMobileMenuOpen(false)} className="py-2 hover:text-[#e6388c] border-b border-slate-50">
+              Customer Support &amp; Showroom
+            </NavLink>
+            {isAdmin ? (
+              <NavLink to="/admin" onClick={() => setMobileMenuOpen(false)} className="py-2 text-[#e6388c] font-bold">
+                ★ SuperAdmin Command Center
+              </NavLink>
+            ) : (
+              <button
+                onClick={() => {
+                  onOpenAdmin();
+                  setMobileMenuOpen(false);
+                }}
+                className="py-2 text-left text-xs text-slate-500 hover:text-[#e6388c] cursor-pointer"
+              >
+                SuperAdmin Portal
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   );
 }
 
 function Footer() {
+  const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [newsletterSent, setNewsletterSent] = useState(false);
+
+  function handleNewsletterSubmit(e) {
+    e.preventDefault();
+    if (!newsletterEmail.trim()) return;
+    setNewsletterSent(true);
+    setTimeout(() => {
+      setNewsletterEmail('');
+      setNewsletterSent(false);
+    }, 4000);
+  }
+
   return (
-    <footer className="site-footer" id="our-note">
-      <div className="footer-brand">
-        <Link className="wordmark footer-wordmark" to="/">
-          <img className="brand-logo" src={brandLogo} alt="" />
-          Rauhie Shop
-        </Link>
-        <p>Premium jewelry, modest fashion, luxury handbags, beauty, gadgets, and thoughtful gifts.</p>
-        <div className="flex items-center gap-2 pt-2 text-[11px] text-pink-300">
-          <ShieldCheck className="w-4 h-4 text-[#e6388c]" />
-          <span>100% Authentic Products · Verified Bangladeshi eCommerce</span>
+    <footer className="site-footer bg-gradient-to-b from-[#fffbfd] via-[#fbf3fa] to-[#f6ecf4] text-[#35104f] border-t border-[#eadde8] pt-14 pb-12" id="our-note">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-12">
+        {/* Top Section: Brand + Newsletter */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pb-10 border-b border-[#eadde8]">
+          <div className="lg:col-span-5 space-y-3.5">
+            <Link className="inline-flex items-center gap-3 group" to="/">
+              <img className="w-12 h-12 rounded-full object-contain ring-2 ring-[#e6388c]/30 group-hover:ring-[#e6388c] transition" src={brandLogo} alt="Rauhie Shop" />
+              <div>
+                <span className="brand-title-gradient text-2xl tracking-tight leading-none">Rauhie Shop</span>
+                <span className="block text-[10px] uppercase font-bold tracking-widest text-[#e6388c] mt-0.5">Bangladeshi Luxury &amp; Gifts</span>
+              </div>
+            </Link>
+            <p className="text-xs text-slate-600 max-w-sm leading-relaxed">
+              Curating authentic handcrafted baroque pearl jewelry, Grade 6A mulberry silk hijabs, vegan leather handbags, artisan perfumes, and bespoke gift hampers.
+            </p>
+            <div className="flex items-center gap-2 pt-1 text-xs text-emerald-800 font-medium">
+              <ShieldCheck className="w-4 h-4 text-[#e6388c] shrink-0" />
+              <span>100% Guaranteed Authenticity · Fast Insured Shipping</span>
+            </div>
+          </div>
+
+          {/* Newsletter Box */}
+          <div className="lg:col-span-7 bg-white/90 border border-[#eadde8] rounded-2xl p-6 shadow-xs flex flex-col justify-between space-y-4">
+            <div>
+              <span className="text-[10px] uppercase font-bold tracking-wider text-[#e6388c]">The Rauhie Circle</span>
+              <h3 className="brand-title-gradient text-lg mt-0.5">
+                Join our Private VIP Newsletter
+              </h3>
+              <p className="text-xs text-slate-600 mt-1">
+                Receive private showcase invitations, early access to festive drops, and an instant ৳150 welcome voucher code.
+              </p>
+            </div>
+            {newsletterSent ? (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-semibold flex items-center gap-2">
+                <Check size={16} className="text-emerald-600" /> Welcome to the Rauhie Circle! Check your inbox for voucher "RAUHIE10".
+              </div>
+            ) : (
+              <form onSubmit={handleNewsletterSubmit} className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="email"
+                  required
+                  value={newsletterEmail}
+                  onChange={(e) => setNewsletterEmail(e.target.value)}
+                  placeholder="Enter your email address..."
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-[#faf5f9] border border-[#eadde8] text-xs text-[#35104f] placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-[#e6388c]"
+                />
+                <button
+                  type="submit"
+                  className="py-2.5 px-6 bg-gradient-to-r from-[#35104f] to-[#e6388c] hover:opacity-95 text-white text-xs font-semibold rounded-xl transition shadow-xs shrink-0 cursor-pointer"
+                >
+                  Join Circle ↗
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+
+        {/* Middle Section: 4 Link Columns */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-xs">
+          <div className="space-y-3">
+            <h4 className="font-bold uppercase tracking-wider text-[#35104f] text-[11px]">Boutique Collections</h4>
+            <ul className="space-y-2 text-slate-600">
+              <li><Link to="/" className="hover:text-[#e6388c] transition">Jewelry &amp; Accessories</Link></li>
+              <li><Link to="/" className="hover:text-[#e6388c] transition">Modest Wear &amp; Pure Silk</Link></li>
+              <li><Link to="/" className="hover:text-[#e6388c] transition">Luxury Vegan Handbags</Link></li>
+              <li><Link to="/" className="hover:text-[#e6388c] transition">Artisan Fragrance &amp; Beauty</Link></li>
+              <li><Link to="/" className="hover:text-[#e6388c] transition">Curated Keepsake Hampers</Link></li>
+            </ul>
+          </div>
+
+          <div className="space-y-3">
+            <h4 className="font-bold uppercase tracking-wider text-[#35104f] text-[11px]">Customer Concierge</h4>
+            <ul className="space-y-2 text-slate-600">
+              <li><Link to="/history" className="hover:text-[#e6388c] transition">Track Live Order</Link></li>
+              <li><Link to="/contact" className="hover:text-[#e6388c] transition">Delivery &amp; Shipping Rates</Link></li>
+              <li><Link to="/contact" className="hover:text-[#e6388c] transition">7-Day Exchange Policy</Link></li>
+              <li><Link to="/account" className="hover:text-[#e6388c] transition">Customer Account</Link></li>
+              <li><Link to="/contact" className="hover:text-[#e6388c] transition">Bespoke Gift Packaging</Link></li>
+            </ul>
+          </div>
+
+          <div className="space-y-3">
+            <h4 className="font-bold uppercase tracking-wider text-[#35104f] text-[11px]">Company &amp; Ethics</h4>
+            <ul className="space-y-2 text-slate-600">
+              <li><Link to="/about" className="hover:text-[#e6388c] transition">About Rauhie</Link></li>
+              <li><Link to="/about" className="hover:text-[#e6388c] transition">Artisanal Sourcing</Link></li>
+              <li><Link to="/contact" className="hover:text-[#e6388c] transition">Corporate Gifting</Link></li>
+              <li><Link to="/admin" className="hover:text-[#e6388c] transition">SuperAdmin Command</Link></li>
+              <li><a href="/api/docs" target="_blank" rel="noreferrer" className="text-[#e6388c] font-semibold hover:underline inline-flex items-center gap-1">Swagger API Docs ↗</a></li>
+            </ul>
+          </div>
+
+          <div className="space-y-3">
+            <h4 className="font-bold uppercase tracking-wider text-[#35104f] text-[11px]">Boutique Showroom HQ</h4>
+            <address className="not-italic text-slate-600 space-y-1.5 leading-relaxed">
+              <p>21 Sukrabad, Dhanmondi 32,</p>
+              <p>Dhaka-1205, Bangladesh</p>
+              <p className="pt-1 text-[#e6388c] font-semibold">
+                Hotline: +88 01710659435
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Email: support@rauhieshop.com
+              </p>
+            </address>
+          </div>
+        </div>
+
+        {/* Bottom Section: Payment Badges & Copyright */}
+        <div className="pt-6 border-t border-[#eadde8] flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+          <div>
+            © {new Date().getFullYear()} Rauhie Shop Bangladesh. All rights reserved. Registered Trade Entity.
+          </div>
+
+          {/* Payment gateway tags */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[10px] uppercase font-bold text-slate-500 mr-1">Accepted Payments:</span>
+            <span className="px-2.5 py-1 bg-white border border-[#eadde8] rounded-md text-[11px] font-semibold text-slate-700 shadow-2xs">bKash</span>
+            <span className="px-2.5 py-1 bg-white border border-[#eadde8] rounded-md text-[11px] font-semibold text-slate-700 shadow-2xs">Nagad</span>
+            <span className="px-2.5 py-1 bg-white border border-[#eadde8] rounded-md text-[11px] font-semibold text-slate-700 shadow-2xs">Visa</span>
+            <span className="px-2.5 py-1 bg-white border border-[#eadde8] rounded-md text-[11px] font-semibold text-slate-700 shadow-2xs">Mastercard</span>
+            <span className="px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-md text-[11px] font-semibold text-emerald-800">Cash on Delivery</span>
+          </div>
         </div>
       </div>
-      <nav className="footer-links" aria-label="Footer navigation">
-        <Link to="/">Shop Collection</Link>
-        <Link to="/about">About Rauhie</Link>
-        <Link to="/contact">Customer Support</Link>
-        <Link to="/history">Order Tracking &amp; History</Link>
-        <Link to="/admin">SuperAdmin Portal</Link>
-      </nav>
-      <address className="footer-address">
-        <strong>Rauhie Shop HQ</strong><br />
-        21 Sukrabad, Dhanmondi 32,<br />
-        Dhaka-1205, Bangladesh<br />
-        <span className="text-[11px] text-[#e6388c]">Helpline: +88 01710659435</span>
-      </address>
     </footer>
   );
 }
@@ -258,7 +505,7 @@ function ProductCard({ product, onAdd, onQuickView }) {
   );
 }
 
-function HomePage({ onAdd, onQuickView }) {
+function HomePage({ onAdd, onQuickView, onOpenGiftAdvisor, onOpenSmartSearch }) {
   const [products, setProducts] = useState(INITIAL_PRODUCTS);
   const [categories, setCategories] = useState(INITIAL_CATEGORIES);
   const [activeCategory, setActiveCategory] = useState('All');
@@ -297,19 +544,27 @@ function HomePage({ onAdd, onQuickView }) {
             <span className="eyebrow-dot" /> Authentic Lifestyle &amp; Fashion
           </p>
           <h1>
-            Discover your<br />
-            <em>next favorite.</em>
+            <span className="brand-title-gradient">Discover your</span><br className="hidden sm:inline" />{' '}
+            <em className="brand-title-gradient">next favorite.</em>
           </h1>
           <p className="hero-description">
             Handcrafted jewelry, modest silk fashion, luxury handbags, niche perfumes, and smart lifestyle essentials curated with care.
           </p>
-          <div className="flex flex-wrap gap-4 items-center">
+          <div className="flex flex-wrap gap-3 items-center">
             <a className="primary-button" href="#new-arrivals">
               Explore Collection <span aria-hidden="true">↘</span>
             </a>
-            <span className="text-xs font-semibold text-[#e6388c]">
-              Use code <strong className="font-mono bg-pink-50 px-2 py-1 rounded border border-pink-200">RAUHIE10</strong> for 10% off
-            </span>
+            <button
+              type="button"
+              onClick={onOpenGiftAdvisor}
+              className="py-3 px-4 bg-gradient-to-r from-[#35104f] to-[#e6388c] text-white text-xs font-semibold hover:opacity-95 transition flex items-center gap-2 cursor-pointer shadow-md rounded-xl"
+            >
+              <Sparkles size={14} className="text-pink-200 animate-pulse" />
+              <span>AI Gift Concierge</span>
+            </button>
+          </div>
+          <div className="mt-3 text-xs font-semibold text-[#e6388c]">
+            Use code <strong className="font-mono bg-pink-50 px-2 py-0.5 rounded border border-pink-200">RAUHIE10</strong> for 10% off launch orders
           </div>
           <div className="hero-note">
             <span>RAUHIE SHOP</span>
@@ -346,14 +601,14 @@ function HomePage({ onAdd, onQuickView }) {
         <div className="section-heading">
           <div>
             <p className="eyebrow">The Catalog</p>
-            <h2>Explore by Category.</h2>
+            <h2 className="brand-title-gradient">Explore by Category.</h2>
           </div>
           <p>Carefully inspected products with authentic quality and competitive pricing.</p>
         </div>
 
         {/* Search & Sort Toolbar */}
         <div className="catalog-toolbar">
-          <label className="catalog-search">
+          <label className="catalog-search flex-1">
             <Search size={17} aria-hidden="true" />
             <input
               type="search"
@@ -363,6 +618,15 @@ function HomePage({ onAdd, onQuickView }) {
               aria-label="Search products"
             />
           </label>
+          <button
+            type="button"
+            onClick={onOpenSmartSearch}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-gradient-to-r from-[#35104f] to-[#e6388c] text-white text-xs font-semibold rounded-lg hover:opacity-95 transition cursor-pointer shrink-0"
+          >
+            <Sparkles size={14} className="text-pink-200" />
+            <span className="hidden sm:inline">Ask AI Search</span>
+            <span className="sm:hidden">AI Search</span>
+          </button>
           <label className="catalog-sort">
             <ArrowDownUp size={16} aria-hidden="true" />
             <select
@@ -420,7 +684,7 @@ function HomePage({ onAdd, onQuickView }) {
   );
 }
 
-function ProductPage({ onAdd, onNotify }) {
+function ProductPage({ onAdd, onNotify, onOpenStyleMatch }) {
   const { id } = useParams();
   const [product, setProduct] = useState(null);
   const [status, setStatus] = useState('loading');
@@ -512,7 +776,7 @@ function ProductPage({ onAdd, onNotify }) {
         <div className="detail-copy">
           <Link className="back-link" to="/">← Back to the edit</Link>
           <p className="eyebrow">{product.category?.name || 'Everyday object'}</p>
-          <h1>{product.name}</h1>
+          <h1 className="brand-title-gradient">{product.name}</h1>
           <div className="flex items-center gap-3 pt-1">
             <RatingSummary rating={product.rating} reviewCount={product.reviewCount || reviews.length} />
             <StockIndicator stock={product.stock} />
@@ -554,6 +818,17 @@ function ProductPage({ onAdd, onNotify }) {
             </button>
           </div>
 
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => onOpenStyleMatch && onOpenStyleMatch(product)}
+              className="w-full py-2.5 px-4 bg-gradient-to-r from-[#35104f] via-[#4a166e] to-[#e6388c] text-white text-xs font-semibold rounded-xl hover:opacity-95 transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+            >
+              <Sparkles size={14} className="text-pink-200 animate-pulse" />
+              <span>Style with AI — Coordinate Complete Look &amp; Save 10%</span>
+            </button>
+          </div>
+
           <div className="pt-4 border-t border-[#eadde8] text-xs text-slate-500 space-y-1">
             <p>✓ SKU: <span className="font-mono">{product.sku || 'RH-PROD'}</span></p>
             <p>✓ Available for Cash on Delivery, bKash, and Card payments.</p>
@@ -567,7 +842,7 @@ function ProductPage({ onAdd, onNotify }) {
         <div className="reviews-heading">
           <div>
             <p className="eyebrow">Customer Feedback</p>
-            <h2>Ratings &amp; Reviews</h2>
+            <h2 className="brand-title-gradient">Ratings &amp; Reviews</h2>
           </div>
           <RatingSummary rating={product.rating} reviewCount={reviews.length} />
         </div>
@@ -645,7 +920,7 @@ function CartPage({ cart, onQuantity, onRemove, onOpenCheckout }) {
       <div className="section-heading cart-heading">
         <div>
           <p className="eyebrow">Your Selection</p>
-          <h1>Shopping Bag<span className="title-period">.</span></h1>
+          <h1 className="brand-title-gradient">Shopping Bag<span className="text-[#e6388c]">.</span></h1>
         </div>
         <span>{items.reduce((sum, i) => sum + i.quantity, 0)} items</span>
       </div>
@@ -733,7 +1008,10 @@ function AboutPage() {
     <main className="brand-page section-wrap">
       <header className="brand-page-heading">
         <p className="eyebrow">About Rauhie Shop</p>
-        <h1>Useful finds for<br /><em>every kind of day.</em></h1>
+        <h1>
+          <span className="brand-title-gradient">Useful finds for</span><br className="hidden sm:inline" />{' '}
+          <em className="brand-title-gradient">every kind of day.</em>
+        </h1>
         <p>Rauhie Shop curates refined jewelry, modest silk fashion, artisanal fragrances, handbags, smart gadgets, and memorable gifts.</p>
       </header>
       <section className="about-values" aria-label="Values">
@@ -756,7 +1034,7 @@ function AboutPage() {
       <section className="about-location">
         <div>
           <p className="eyebrow">Visit Our Showroom</p>
-          <h2>Rauhie Shop</h2>
+          <h2 className="brand-title-gradient">Rauhie Shop</h2>
         </div>
         <address>
           21 Sukrabad, Dhanmondi 32,<br />
@@ -773,7 +1051,10 @@ function ContactPage() {
     <main className="brand-page contact-page section-wrap">
       <header className="brand-page-heading">
         <p className="eyebrow">Contact Rauhie Shop</p>
-        <h1>We’re always<br /><em>easy to reach.</em></h1>
+        <h1>
+          <span className="brand-title-gradient">We’re always</span><br className="hidden sm:inline" />{' '}
+          <em className="brand-title-gradient">easy to reach.</em>
+        </h1>
         <p>Reach out for product inquiries, wholesale requests, or delivery updates.</p>
       </header>
       <section className="contact-details" aria-label="Contact options">
@@ -842,7 +1123,7 @@ function AuthPage({ isRegister = false, session, onSignIn }) {
     <main className="account-page section-wrap">
       <div className="account-form-wrap">
         <p className="eyebrow">{isRegister ? 'Join Rauhie Shop' : 'Welcome back'}</p>
-        <h1>{isRegister ? 'Create your account.' : 'Sign in.'}</h1>
+        <h1 className="brand-title-gradient">{isRegister ? 'Create your account.' : 'Sign in.'}</h1>
         <p className="account-intro">
           {isRegister ? 'Register to track orders and save your delivery addresses.' : 'Sign in to access your profile and order history.'}
         </p>
@@ -928,7 +1209,7 @@ function AccountPage({ session, onSignOut }) {
     return (
       <main className="account-page section-wrap">
         <p className="eyebrow">Rauhie Shop Account</p>
-        <h1>Sign in to your account.</h1>
+        <h1 className="brand-title-gradient">Sign in to your account.</h1>
         <Link className="primary-button" to="/login">Sign In <span aria-hidden="true">↗</span></Link>
       </main>
     );
@@ -940,7 +1221,7 @@ function AccountPage({ session, onSignOut }) {
   return (
     <main className="account-page section-wrap">
       <p className="eyebrow">Your Profile</p>
-      <h1>Welcome back, {user.name || 'Shopper'}.</h1>
+      <h1 className="brand-title-gradient">Welcome back, {user.name || 'Shopper'}.</h1>
       <p className="account-intro">{user.email}</p>
 
       <div className="account-profile">
@@ -1015,6 +1296,9 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState('');
   const [quickProduct, setQuickProduct] = useState(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [isGiftAdvisorOpen, setIsGiftAdvisorOpen] = useState(false);
+  const [isSmartSearchOpen, setIsSmartSearchOpen] = useState(false);
+  const [styleMatchProduct, setStyleMatchProduct] = useState(null);
 
   const itemCount = useMemo(
     () => Object.values(cart).reduce((sum, item) => sum + item.quantity, 0),
@@ -1097,16 +1381,20 @@ export default function App() {
     <>
       <div className="app-shell">
         {/* Top Announcement Bar */}
-        <div className="announcement">
-          A little more joy in the everyday <span aria-hidden="true">✳</span>
-          Special Launch: Use voucher code <strong>RAUHIE10</strong> for 10% off <span aria-hidden="true">✳</span>
-          Express delivery across Bangladesh
+        <div className="announcement" role="region" aria-label="Announcement">
+          <span>A little more joy in the everyday</span>
+          <span className="hidden md:inline" aria-hidden="true">✳</span>
+          <span>Special Launch: Use voucher code <strong>RAUHIE10</strong> for 10% off</span>
+          <span className="hidden sm:inline" aria-hidden="true">✳</span>
+          <span className="hidden sm:inline">Express delivery across Bangladesh</span>
         </div>
 
         <Header
           itemCount={itemCount}
           session={session}
           onOpenAdmin={handleAuthenticateAdmin}
+          onOpenGiftAdvisor={() => setIsGiftAdvisorOpen(true)}
+          onOpenSmartSearch={() => setIsSmartSearchOpen(true)}
         />
 
         <Routes>
@@ -1116,6 +1404,8 @@ export default function App() {
               <HomePage
                 onAdd={addToCart}
                 onQuickView={setQuickProduct}
+                onOpenGiftAdvisor={() => setIsGiftAdvisorOpen(true)}
+                onOpenSmartSearch={() => setIsSmartSearchOpen(true)}
               />
             }
           />
@@ -1125,6 +1415,7 @@ export default function App() {
               <ProductPage
                 onAdd={addToCart}
                 onNotify={showToast}
+                onOpenStyleMatch={(prod) => setStyleMatchProduct(prod)}
               />
             }
           />
@@ -1169,7 +1460,7 @@ export default function App() {
                 <div className="section-heading">
                   <div>
                     <p className="eyebrow">Your Customer Orders</p>
-                    <h1>Order History &amp; Tracking<span className="title-period">.</span></h1>
+                    <h1 className="brand-title-gradient">Order History &amp; Tracking<span className="text-[#e6388c]">.</span></h1>
                   </div>
                   <span>{orders.length} orders</span>
                 </div>
@@ -1231,7 +1522,7 @@ export default function App() {
                 <span className="text-xs font-bold uppercase tracking-wider text-[#e6388c]">
                   {quickProduct.category?.name || 'Item'}
                 </span>
-                <h3 className="text-lg font-serif font-bold text-[#35104f]">{quickProduct.name}</h3>
+                <h3 className="text-lg font-serif italic font-bold brand-title-gradient">{quickProduct.name}</h3>
                 <div className="flex items-center gap-2">
                   <StockIndicator stock={quickProduct.stock} />
                 </div>
@@ -1263,6 +1554,32 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* AI Gift Advisor Modal */}
+      <AIGiftAdvisorModal
+        isOpen={isGiftAdvisorOpen}
+        onClose={() => setIsGiftAdvisorOpen(false)}
+        onAddToCart={addToCart}
+      />
+
+      {/* AI Style Match Modal */}
+      <AIStyleMatchModal
+        isOpen={Boolean(styleMatchProduct)}
+        onClose={() => setStyleMatchProduct(null)}
+        product={styleMatchProduct}
+        onAddToCart={addToCart}
+        onAddBundle={(items) => {
+          items.forEach((item) => addToCart(item));
+          showToast('Complete look added to your bag!');
+        }}
+      />
+
+      {/* AI Smart Search Modal */}
+      <AISmartSearchModal
+        isOpen={isSmartSearchOpen}
+        onClose={() => setIsSmartSearchOpen(false)}
+        onQuickView={setQuickProduct}
+      />
 
       {/* Checkout Modal with Payment Gateways */}
       <CheckoutModal

@@ -702,6 +702,103 @@ export const api = {
       lowStockProducts,
       recentOrders: orders.slice(0, 5)
     };
+  },
+
+  // --- AI INTELLIGENCE (Gemini 3.8 Flash) ---
+  async getGiftRecommendations({ recipient, occasion, budget, interests, styleNotes }) {
+    try {
+      const res = await fetch(`${API_BASE}/ai/gift-advisor`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipient, occasion, budget, interests, styleNotes }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return json.data || json;
+      }
+    } catch {
+      // Fallback
+    }
+
+    const products = getLocalItem(STORAGE_KEYS.PRODUCTS, INITIAL_PRODUCTS);
+    const primary = products[0];
+    const secondary = products[1];
+    return {
+      greeting: `Welcome! Here are exquisite gift ideas handpicked for ${recipient || 'your loved one'}.`,
+      occasionInsight: `For ${occasion || 'this special celebration'}, enduring craftsmanship and personal touches make memories unforgettable.`,
+      recommendations: [
+        {
+          productId: primary.id,
+          product: primary,
+          whyItFits: `${primary.name} is one of our most requested heirloom pieces.`,
+          curatorTip: 'Add custom ribbon packaging and a handwritten card.',
+        },
+        {
+          productId: secondary.id,
+          product: secondary,
+          whyItFits: `${secondary.name} delivers comfortable daily luxury with peerless finish.`,
+          curatorTip: 'Pairs beautifully with our fragrance collection.',
+        },
+      ],
+      customGiftCardMessage: 'Wishing you grace, joy, and cherished moments today and always.',
+      giftWrappingSuggestion: 'Blush satin ribbon over our deep purple velvet presentation box.',
+    };
+  },
+
+  async getStyleMatch({ productId, styleVibe }) {
+    try {
+      const res = await fetch(`${API_BASE}/ai/style-match`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId, styleVibe }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return json.data || json;
+      }
+    } catch {
+      // Fallback
+    }
+
+    const products = getLocalItem(STORAGE_KEYS.PRODUCTS, INITIAL_PRODUCTS);
+    const current = products.find((p) => p.id === productId) || products[0];
+    const paired = products.filter((p) => p.categoryId !== current.categoryId).slice(0, 3);
+    return {
+      lookTitle: 'The Signature Rauhie Palette',
+      stylingPhilosophy: 'Balancing muted blush tones with warm gold accents creates a cohesive, effortlessly polished statement.',
+      fashionAdvice: `Wear the ${current.name} as the centerpiece, elevated with complementary accessories.`,
+      baseProduct: current,
+      pairedProducts: paired,
+    };
+  },
+
+  async searchWithAI(query) {
+    try {
+      const res = await fetch(`${API_BASE}/ai/smart-search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return json;
+      }
+    } catch {
+      // Fallback
+    }
+
+    const products = getLocalItem(STORAGE_KEYS.PRODUCTS, INITIAL_PRODUCTS);
+    const q = (query || '').toLowerCase();
+    const matches = products.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.description?.toLowerCase().includes(q) ||
+        p.category?.name?.toLowerCase().includes(q)
+    );
+    return {
+      interpretation: `Matches for "${query}"`,
+      matches: matches.length > 0 ? matches : products,
+    };
   }
 };
 

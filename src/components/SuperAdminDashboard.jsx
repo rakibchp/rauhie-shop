@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Package, ShoppingBag, Users, AlertTriangle, TrendingUp, Plus, 
-  Trash2, Edit3, Check, X, Search, RefreshCw, Eye, ArrowUpRight, DollarSign 
+  Trash2, Edit3, X, Search, RefreshCw, DollarSign 
 } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -40,7 +40,30 @@ export default function SuperAdminDashboard({ session, onSignInAdmin }) {
   const isAdmin = session?.user?.role === 'ADMIN';
 
   useEffect(() => {
-    loadDashboardData();
+    let ignore = false;
+    Promise.all([
+      api.getAdminStats(session?.token),
+      api.getOrders(session?.token),
+      api.getProducts({ category: 'All' }),
+      api.getCategories(),
+    ]).then(([statsData, ordersData, productsData, categoriesData]) => {
+      if (!ignore) {
+        setStats(statsData);
+        setOrders(ordersData);
+        setProducts(productsData);
+        setCategories(categoriesData);
+        setLoading(false);
+      }
+    }).catch((e) => {
+      console.error('Failed to load dashboard data', e);
+      if (!ignore) {
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      ignore = true;
+    };
   }, [session]);
 
   async function loadDashboardData() {
@@ -229,7 +252,7 @@ export default function SuperAdminDashboard({ session, onSignInAdmin }) {
               <span className="w-2 h-2 rounded-full bg-[#e6388c] animate-ping" />
               SuperAdmin Command Center
             </div>
-            <h1 className="text-3xl font-serif font-bold tracking-tight mt-1">
+            <h1 className="text-3xl font-serif italic font-bold tracking-tight mt-1 bg-gradient-to-r from-pink-200 via-white to-pink-300 bg-clip-text text-transparent">
               Rauhie Shop Administration
             </h1>
             <p className="text-sm text-pink-100/80 mt-1">

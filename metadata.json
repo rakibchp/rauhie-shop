@@ -1,0 +1,9 @@
+{
+  "name": "Rauhie Shop",
+  "description": "Shop beauty, modest wear, luxury handbags, gadgets, and thoughtful gifts.",
+  "prompt": "Rauhie Shop — Beauty, Gifts & More",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,5 +1,4 @@
-import React from 'react';
-import { Package, Truck, CheckCircle2, Clock, ArrowRight, ExternalLink, RefreshCw } from 'lucide-react';
+import { Package, ArrowRight, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function OrderHistoryView({ orders = [], onReorder }) {
@@ -9,7 +8,7 @@ export default function OrderHistoryView({ orders = [], onReorder }) {
         <div className="w-16 h-16 mx-auto rounded-full bg-[#fdf2f8] text-[#e6388c] flex items-center justify-center">
           <Package className="w-8 h-8" />
         </div>
-        <h2 className="text-2xl font-serif font-bold text-[#35104f]">
+        <h2 className="text-2xl font-serif italic font-bold brand-title-gradient">
           No orders yet
         </h2>
         <p className="text-xs text-slate-500 leading-relaxed">
