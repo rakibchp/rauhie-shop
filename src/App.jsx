@@ -1,449 +1,731 @@
-import { Accessibility, ArrowDownUp, Eye, History as HistoryIcon, LogOut, Search, Star, UserRound, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
-import './App.css'
-import brandLogo from './assets/logo.png'
-import AdminProductsPage from './components/AdminProductsPage.jsx'
-
-const API_BASE = 'https://api.escuelajs.co/api/v1'
-
-function readSavedCart() {
-  try {
-    return JSON.parse(localStorage.getItem('shop-cart') || '{}')
-  } catch {
-    return {}
-  }
-}
-
-function readSavedReviews() {
-  try {
-    return JSON.parse(localStorage.getItem('shop-product-reviews') || '{}')
-  } catch {
-    return {}
-  }
-}
-
-function readSavedSession() {
-  try {
-    return JSON.parse(localStorage.getItem('shop-session') || 'null')
-  } catch {
-    return null
-  }
-}
-
-function readSavedOrders() {
-  try {
-    return JSON.parse(localStorage.getItem('shop-order-history') || '[]')
-  } catch {
-    return []
-  }
-}
-
-function readSavedStock() {
-  try {
-    return JSON.parse(localStorage.getItem('shop-product-stock') || '{}')
-  } catch {
-    return {}
-  }
-}
-
-function readAccessibilitySettings() {
-  try {
-    return JSON.parse(localStorage.getItem('shop-accessibility') || '{"largeText":false,"highContrast":false,"reduceMotion":false}')
-  } catch {
-    return { largeText: false, highContrast: false, reduceMotion: false }
-  }
-}
+import { Accessibility, ArrowDownUp, Eye, History as HistoryIcon, LogOut, Search, Star, UserRound, X, ShoppingBag, ShieldCheck, Check } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
+import './App.css';
+import brandLogo from './assets/logo.png';
+import CheckoutModal from './components/CheckoutModal.jsx';
+import SuperAdminDashboard from './components/SuperAdminDashboard.jsx';
+import OrderHistoryView from './components/OrderHistoryView.jsx';
+import Toast from './components/Toast.jsx';
+import { api, INITIAL_PRODUCTS, INITIAL_CATEGORIES } from './services/api.js';
 
 function formatPrice(price) {
-  return new Intl.NumberFormat('en-BD', { style: 'currency', currency: 'BDT', currencyDisplay: 'narrowSymbol' }).format(price)
+  return new Intl.NumberFormat('en-BD', { style: 'currency', currency: 'BDT', currencyDisplay: 'narrowSymbol' }).format(price);
 }
 
-function getReviewAverage(reviews) {
-  return reviews.length
-    ? reviews.reduce((total, review) => total + review.rating, 0) / reviews.length
-    : null
+function StockIndicator({ stock, className = '' }) {
+  if (stock === undefined || stock === null) return null;
+  if (stock <= 0) {
+    return <span className={`stock-indicator stock-unavailable ${className}`}>Out of stock</span>;
+  }
+  if (stock <= 5) {
+    return <span className={`stock-indicator bg-rose-50 text-rose-700 border border-rose-200 font-bold ${className}`}>Only {stock} left!</span>;
+  }
+  return <span className={`stock-indicator ${className}`}>In Stock ({stock})</span>;
 }
 
-function StockIndicator({ product, stock, className = '' }) {
-  const quantity = stock?.[product.id] ?? product.stock
+function TopRatedBadge({ rating }) {
+  if (!rating || rating < 4.8) return null;
   return (
-    <span className={`stock-indicator ${quantity == null ? 'stock-unavailable' : ''} ${className}`}>
-      Stock {quantity == null ? 'not supplied' : quantity}
+    <span className="top-rated-badge">
+      <Star size={11} fill="currentColor" aria-hidden="true" /> Top rated
     </span>
-  )
-}
-
-function TopRatedBadge({ reviews }) {
-  const average = getReviewAverage(reviews)
-  if (reviews.length < 2 || average < 4.5) return null
-  return <span className="top-rated-badge"><Star size={12} fill="currentColor" aria-hidden="true" />Top rated</span>
+  );
 }
 
 function ProductImage({ src, alt, className = '' }) {
   return (
     <div className={`product-image ${className}`}>
-      {src && <img src={src} alt={alt} loading="lazy" onError={(event) => {
-        event.currentTarget.style.display = 'none'
-        event.currentTarget.nextElementSibling?.classList.add('is-visible')
-      }} />}
-      <span className={`image-fallback ${src ? '' : 'is-visible'}`} aria-hidden="true">Object / daily</span>
+      {src && (
+        <img
+          src={src}
+          alt={alt}
+          loading="lazy"
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+            e.currentTarget.nextElementSibling?.classList.add('is-visible');
+          }}
+        />
+      )}
+      <span className={`image-fallback ${src ? '' : 'is-visible'}`} aria-hidden="true">
+        Rauhie Collection
+      </span>
     </div>
-  )
+  );
 }
 
 function AccessibilityControls() {
-  const [open, setOpen] = useState(false)
-  const [settings, setSettings] = useState(readAccessibilitySettings)
-
-  useEffect(() => {
-    const root = document.documentElement
-    root.classList.toggle('a11y-large-text', settings.largeText)
-    root.classList.toggle('a11y-high-contrast', settings.highContrast)
-    root.classList.toggle('a11y-reduced-motion', settings.reduceMotion)
-    localStorage.setItem('shop-accessibility', JSON.stringify(settings))
-  }, [settings])
-
-  useEffect(() => {
-    if (!open) return undefined
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') setOpen(false)
+  const [open, setOpen] = useState(false);
+  const [settings, setSettings] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('shop-accessibility') || '{"largeText":false,"highContrast":false,"reduceMotion":false}');
+    } catch {
+      return { largeText: false, highContrast: false, reduceMotion: false };
     }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [open])
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle('a11y-large-text', settings.largeText);
+    root.classList.toggle('a11y-high-contrast', settings.highContrast);
+    root.classList.toggle('a11y-reduced-motion', settings.reduceMotion);
+    localStorage.setItem('shop-accessibility', JSON.stringify(settings));
+  }, [settings]);
 
   return (
     <div className="accessibility-control">
-      <button className="icon-button accessibility-trigger" type="button" aria-label="Accessibility settings" aria-expanded={open} aria-controls="accessibility-panel" title="Accessibility settings" onClick={() => setOpen((current) => !current)}>
-        <Accessibility size={19} aria-hidden="true" />
+      <button
+        className="icon-button accessibility-trigger"
+        type="button"
+        aria-label="Accessibility settings"
+        onClick={() => setOpen((c) => !c)}
+      >
+        <Accessibility size={18} aria-hidden="true" />
       </button>
-      {open && <section className="accessibility-panel" id="accessibility-panel" aria-label="Accessibility settings">
-        <h2>Accessibility</h2>
-        <label><input type="checkbox" checked={settings.largeText} onChange={(event) => setSettings((current) => ({ ...current, largeText: event.target.checked }))} />Larger text</label>
-        <label><input type="checkbox" checked={settings.highContrast} onChange={(event) => setSettings((current) => ({ ...current, highContrast: event.target.checked }))} />Higher contrast</label>
-        <label><input type="checkbox" checked={settings.reduceMotion} onChange={(event) => setSettings((current) => ({ ...current, reduceMotion: event.target.checked }))} />Reduce motion</label>
-        <button className="text-button accessibility-reset" type="button" onClick={() => setSettings({ largeText: false, highContrast: false, reduceMotion: false })}>Reset settings</button>
-      </section>}
+      {open && (
+        <section className="accessibility-panel" aria-label="Accessibility settings">
+          <div className="flex items-center justify-between pb-1 border-b">
+            <h2>Accessibility</h2>
+            <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-700">
+              <X size={16} />
+            </button>
+          </div>
+          <label>
+            <input
+              type="checkbox"
+              checked={settings.largeText}
+              onChange={(e) => setSettings((c) => ({ ...c, largeText: e.target.checked }))}
+            />
+            Larger text
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={settings.highContrast}
+              onChange={(e) => setSettings((c) => ({ ...c, highContrast: e.target.checked }))}
+            />
+            Higher contrast
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={settings.reduceMotion}
+              onChange={(e) => setSettings((c) => ({ ...c, reduceMotion: e.target.checked }))}
+            />
+            Reduce motion
+          </label>
+          <button
+            className="text-button accessibility-reset"
+            type="button"
+            onClick={() => setSettings({ largeText: false, highContrast: false, reduceMotion: false })}
+          >
+            Reset settings
+          </button>
+        </section>
+      )}
     </div>
-  )
+  );
 }
 
-function Header({ itemCount, user }) {
+function Header({ itemCount, session, onOpenAdmin }) {
+  const isAdmin = session?.user?.role === 'ADMIN';
+
   return (
-    <header className="site-header">
+    <header className="site-header sticky top-0 z-40 bg-[#fffbfd]/95 backdrop-blur-md shadow-xs">
       <div className="header-inner">
-        <Link className="wordmark" to="/" aria-label="Rauhie Shop home"><img className="brand-logo" src={brandLogo} alt="" />Rauhie Shop</Link>
+        <Link className="wordmark" to="/" aria-label="Rauhie Shop home">
+          <img className="brand-logo" src={brandLogo} alt="Rauhie Shop Logo" />
+          <span>Rauhie Shop</span>
+        </Link>
         <nav className="main-nav" aria-label="Main navigation">
           <NavLink to="/" end>Shop</NavLink>
           <a href="/#new-arrivals">New arrivals</a>
+          <NavLink to="/history">Orders</NavLink>
           <NavLink to="/about">About</NavLink>
           <NavLink to="/contact">Contact</NavLink>
-          <NavLink className="account-nav-link" to={user ? '/account' : '/login'}><UserRound size={14} aria-hidden="true" />{user ? 'Account' : 'Sign in'}</NavLink>
-          {user?.role === 'admin' && <NavLink to="/admin/products">Manage products</NavLink>}
+          {isAdmin ? (
+            <NavLink to="/admin" className="text-[#e6388c] font-bold">
+              ★ SuperAdmin
+            </NavLink>
+          ) : (
+            <button
+              onClick={onOpenAdmin}
+              type="button"
+              className="text-[11px] font-semibold text-[#e6388c] hover:underline cursor-pointer"
+            >
+              Admin Portal
+            </button>
+          )}
         </nav>
         <div className="header-actions">
           <AccessibilityControls />
+          <NavLink className="account-nav-link" to={session ? '/account' : '/login'}>
+            <UserRound size={14} aria-hidden="true" />
+            <span>{session ? (session.user?.name || 'Account') : 'Sign in'}</span>
+          </NavLink>
           <Link className="bag-link" to="/cart" aria-label={`Shopping bag, ${itemCount} items`}>
             Bag <span className="bag-count">{itemCount}</span>
           </Link>
         </div>
       </div>
     </header>
-  )
+  );
 }
 
 function Footer() {
   return (
     <footer className="site-footer" id="our-note">
       <div className="footer-brand">
-        <Link className="wordmark footer-wordmark" to="/"><img className="brand-logo" src={brandLogo} alt="" />Rauhie Shop</Link>
-        <p>Gadgets, Toys, Beauty, gifts, everyday essentials, and more.</p>
+        <Link className="wordmark footer-wordmark" to="/">
+          <img className="brand-logo" src={brandLogo} alt="" />
+          Rauhie Shop
+        </Link>
+        <p>Premium jewelry, modest fashion, luxury handbags, beauty, gadgets, and thoughtful gifts.</p>
+        <div className="flex items-center gap-2 pt-2 text-[11px] text-pink-300">
+          <ShieldCheck className="w-4 h-4 text-[#e6388c]" />
+          <span>100% Authentic Products · Verified Bangladeshi eCommerce</span>
+        </div>
       </div>
       <nav className="footer-links" aria-label="Footer navigation">
-        <Link to="/">Shop</Link><Link to="/about">About</Link><Link to="/contact">Contact</Link><Link to="/history">Order history</Link>
+        <Link to="/">Shop Collection</Link>
+        <Link to="/about">About Rauhie</Link>
+        <Link to="/contact">Customer Support</Link>
+        <Link to="/history">Order Tracking &amp; History</Link>
+        <Link to="/admin">SuperAdmin Portal</Link>
       </nav>
-      <address className="footer-address">21 Sukrabad, Dhanmondi 32,<br />Dhaka-1205</address>
+      <address className="footer-address">
+        <strong>Rauhie Shop HQ</strong><br />
+        21 Sukrabad, Dhanmondi 32,<br />
+        Dhaka-1205, Bangladesh<br />
+        <span className="text-[11px] text-[#e6388c]">Helpline: +88 01710659435</span>
+      </address>
     </footer>
-  )
+  );
 }
 
-function RatingSummary({ reviews = [] }) {
-  const average = getReviewAverage(reviews)
-
+function RatingSummary({ rating = 4.9, reviewCount = 12 }) {
   return (
-    <span className="product-rating" aria-label={average ? `${average.toFixed(1)} out of 5 from ${reviews.length} reviews` : 'No reviews yet'}>
-      <Star size={13} fill={average ? 'currentColor' : 'none'} aria-hidden="true" />
-      <span>{average ? average.toFixed(1) : 'New'}</span>
-      <span>({reviews.length})</span>
+    <span className="product-rating" aria-label={`${rating} out of 5 stars`}>
+      <Star size={13} fill="currentColor" aria-hidden="true" className="text-amber-400" />
+      <span>{Number(rating).toFixed(1)}</span>
+      <span>({reviewCount})</span>
     </span>
-  )
+  );
 }
 
-function ProductCard({ product, onAdd, onQuickView, reviews, stock }) {
-  const category = product.category?.name || 'Everyday'
+function ProductCard({ product, onAdd, onQuickView }) {
+  const categoryName = product.category?.name || 'Everyday';
+  const isOutOfStock = product.stock <= 0;
+
   return (
-    <article className="product-card">
-      <TopRatedBadge reviews={reviews} />
-      <button className="quick-view-button" type="button" aria-label={`Quick view ${product.title}`} title={`Quick view ${product.title}`} onClick={() => onQuickView(product)}>
+    <article className="product-card group">
+      <TopRatedBadge rating={product.rating} />
+      <button
+        className="quick-view-button"
+        type="button"
+        aria-label={`Quick view ${product.name}`}
+        title={`Quick view ${product.name}`}
+        onClick={() => onQuickView(product)}
+      >
         <Eye size={17} aria-hidden="true" />
       </button>
-      <StockIndicator product={product} stock={stock} />
+      <StockIndicator stock={product.stock} />
       <Link className="product-card-link" to={`/products/${product.id}`}>
-        <ProductImage src={product.images?.[0]} alt={product.title} />
-        <div className="product-meta"><span>{category}</span><span>{formatPrice(product.price)}</span></div>
-        <h3>{product.title}</h3>
+        <ProductImage src={product.images?.[0]} alt={product.name} />
+        <div className="product-meta">
+          <span>{categoryName}</span>
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-bold text-[#e6388c]">{formatPrice(product.price)}</span>
+            {product.compareAtPrice && (
+              <span className="text-[11px] text-slate-400 line-through">
+                {formatPrice(product.compareAtPrice)}
+              </span>
+            )}
+          </div>
+        </div>
+        <h3 className="group-hover:text-[#e6388c] transition-colors">{product.name}</h3>
       </Link>
-      <RatingSummary reviews={reviews} />
-      <button className="quick-add" type="button" onClick={() => onAdd(product)}>Add to bag <span aria-hidden="true">+</span></button>
+      <RatingSummary rating={product.rating} reviewCount={product.reviewCount} />
+      <button
+        className={`quick-add ${isOutOfStock ? 'opacity-50 cursor-not-allowed' : ''}`}
+        type="button"
+        disabled={isOutOfStock}
+        onClick={() => onAdd(product)}
+      >
+        {isOutOfStock ? 'Sold out' : 'Add to bag'} <span aria-hidden="true">+</span>
+      </button>
     </article>
-  )
+  );
 }
 
-function HomePage({ onAdd, reviews, stock }) {
-  const [products, setProducts] = useState([])
-  const [categories, setCategories] = useState([])
-  const [activeCategory, setActiveCategory] = useState('All')
-  const [searchTerm, setSearchTerm] = useState('')
-  const [priceOrder, setPriceOrder] = useState('featured')
-  const [quickProduct, setQuickProduct] = useState(null)
-  const [status, setStatus] = useState('loading')
-  const quickViewRef = useRef(null)
+function HomePage({ onAdd, onQuickView }) {
+  const [products, setProducts] = useState(INITIAL_PRODUCTS);
+  const [categories, setCategories] = useState(INITIAL_CATEGORIES);
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('featured');
+  const [status, setStatus] = useState('loading');
 
   useEffect(() => {
-    if (quickProduct && quickViewRef.current && !quickViewRef.current.open) {
-      quickViewRef.current.showModal()
-    }
-  }, [quickProduct])
-
-  useEffect(() => {
-    let active = true
+    let active = true;
     Promise.all([
-      fetch(`${API_BASE}/products?offset=0&limit=50`).then((response) => {
-        if (!response.ok) throw new Error('Products could not be loaded')
-        return response.json()
-      }),
-      fetch(`${API_BASE}/categories`).then((response) => response.ok ? response.json() : []),
-    ]).then(([productData, categoryData]) => {
-      if (!active) return
-      setProducts(Array.isArray(productData) ? productData : [])
-      const productCategoryIds = new Set(productData.map((product) => product.category?.id))
-      setCategories(Array.isArray(categoryData) ? categoryData.filter((category) => productCategoryIds.has(category.id)) : [])
-      setStatus('ready')
-    }).catch(() => {
-      if (active) setStatus('error')
-    })
-    return () => { active = false }
-  }, [])
+      api.getProducts({ category: activeCategory, search: searchTerm, sortBy }),
+      api.getCategories(),
+    ])
+      .then(([prods, cats]) => {
+        if (!active) return;
+        setProducts(prods);
+        setCategories(cats);
+        setStatus('ready');
+      })
+      .catch(() => {
+        if (active) setStatus('ready');
+      });
+    return () => {
+      active = false;
+    };
+  }, [activeCategory, searchTerm, sortBy]);
 
-  const normalizedSearch = searchTerm.trim().toLowerCase()
-  const filteredProducts = products.filter((product) => {
-    const matchesCategory = activeCategory === 'All' || product.category?.name === activeCategory
-    const searchableText = `${product.title} ${product.description} ${product.category?.name || ''}`.toLowerCase()
-    return matchesCategory && (!normalizedSearch || searchableText.includes(normalizedSearch))
-  })
-  const visibleProducts = [...filteredProducts].sort((first, second) => {
-    if (priceOrder === 'low-to-high') return first.price - second.price
-    if (priceOrder === 'high-to-low') return second.price - first.price
-    return 0
-  })
-  const heroProduct = products[0]
+  const heroProduct = products[0];
 
   return (
     <main>
+      {/* Hero Showcase */}
       <section className="hero">
         <div className="hero-copy">
-          <p className="eyebrow"><span className="eyebrow-dot" /> Gadgets · Toys · Beauty · Gifts · More</p>
-          <h1>Find your<br /><em>next favorite.</em></h1>
-          <p className="hero-description">Gadgets, Toys, Beauty, gifts, everyday essentials, and more.</p>
-          <a className="primary-button" href="#new-arrivals">Explore products <span aria-hidden="true">↘</span></a>
-          <div className="hero-note"><span>RAUHIE SHOP</span><span>More choice, every day</span></div>
+          <p className="eyebrow">
+            <span className="eyebrow-dot" /> Authentic Lifestyle &amp; Fashion
+          </p>
+          <h1>
+            Discover your<br />
+            <em>next favorite.</em>
+          </h1>
+          <p className="hero-description">
+            Handcrafted jewelry, modest silk fashion, luxury handbags, niche perfumes, and smart lifestyle essentials curated with care.
+          </p>
+          <div className="flex flex-wrap gap-4 items-center">
+            <a className="primary-button" href="#new-arrivals">
+              Explore Collection <span aria-hidden="true">↘</span>
+            </a>
+            <span className="text-xs font-semibold text-[#e6388c]">
+              Use code <strong className="font-mono bg-pink-50 px-2 py-1 rounded border border-pink-200">RAUHIE10</strong> for 10% off
+            </span>
+          </div>
+          <div className="hero-note">
+            <span>RAUHIE SHOP</span>
+            <span>Premium Selection · Fast Delivery</span>
+          </div>
         </div>
         <div className="hero-visual">
           <div className="hero-sunburst" aria-hidden="true">✳</div>
           {heroProduct ? (
-            <Link to={`/products/${heroProduct.id}`} className="hero-product">
-              <ProductImage src={heroProduct.images?.[0]} alt={heroProduct.title} />
-              <span className="hero-product-label">A good find<br />for your day <b>↗</b></span>
+            <Link to={`/products/${heroProduct.id}`} className="hero-product group">
+              <ProductImage src={heroProduct.images?.[0]} alt={heroProduct.name} />
+              <span className="hero-product-label">
+                Featured Pick<br />
+                <b>{heroProduct.name} ↗</b>
+              </span>
             </Link>
-          ) : <div className="hero-placeholder">A good find<br />for your day <span>↗</span></div>}
-          <span className="hero-side-note">EXPLORE WHAT YOU LOVE</span>
+          ) : (
+            <div className="hero-placeholder">Rauhie Edit <span>↗</span></div>
+          )}
+          <span className="hero-side-note">EXPLORE PREMIUM EDITIONS</span>
         </div>
       </section>
 
+      {/* Trust benefit strip */}
       <section className="benefit-strip" aria-label="Shopping benefits">
-        <span>Quality products</span><span>Perfect for gifts</span><span>Trendy and affordable</span><span>Trusted service</span>
+        <span>✓ 100% Authentic Quality</span>
+        <span>✓ Cash on Delivery &amp; bKash</span>
+        <span>✓ 24-48h Delivery in Dhaka</span>
+        <span>✓ Hassle-Free Exchange</span>
       </section>
 
+      {/* Catalog Section */}
       <section className="catalog section-wrap" id="new-arrivals">
         <div className="section-heading">
-          <div><p className="eyebrow">Shop across categories</p><h2>Find what you need.</h2></div>
-          <p>Browse gadgets, toys, clothing, beauty products, home finds, gifts, and more.</p>
+          <div>
+            <p className="eyebrow">The Catalog</p>
+            <h2>Explore by Category.</h2>
+          </div>
+          <p>Carefully inspected products with authentic quality and competitive pricing.</p>
         </div>
+
+        {/* Search & Sort Toolbar */}
         <div className="catalog-toolbar">
           <label className="catalog-search">
             <Search size={17} aria-hidden="true" />
-            <input type="search" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search gadgets, clothing, beauty..." aria-label="Search products" />
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search jewelry, silk hijabs, perfume, bags..."
+              aria-label="Search products"
+            />
           </label>
           <label className="catalog-sort">
             <ArrowDownUp size={16} aria-hidden="true" />
-            <select aria-label="Sort products by price" value={priceOrder} onChange={(event) => setPriceOrder(event.target.value)}>
-              <option value="featured">Featured</option>
-              <option value="low-to-high">Price: low to high</option>
-              <option value="high-to-low">Price: high to low</option>
+            <select
+              aria-label="Sort products"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+            >
+              <option value="featured">Featured Picks</option>
+              <option value="low-to-high">Price: Low to High</option>
+              <option value="high-to-low">Price: High to Low</option>
+              <option value="rating">Highest Rated</option>
             </select>
           </label>
         </div>
+
+        {/* Category Filter Pills */}
         <div className="category-list" aria-label="Filter by category">
-          <button className={activeCategory === 'All' ? 'category-chip active' : 'category-chip'} onClick={() => setActiveCategory('All')} type="button">Everything</button>
+          <button
+            className={activeCategory === 'All' ? 'category-chip active' : 'category-chip'}
+            onClick={() => setActiveCategory('All')}
+            type="button"
+          >
+            All Items
+          </button>
           {categories.map((category) => (
-            <button className={activeCategory === category.name ? 'category-chip active' : 'category-chip'} key={category.id} onClick={() => setActiveCategory(category.name)} type="button">{category.name}</button>
+            <button
+              className={activeCategory === category.name ? 'category-chip active' : 'category-chip'}
+              key={category.id}
+              onClick={() => setActiveCategory(category.name)}
+              type="button"
+            >
+              {category.name}
+            </button>
           ))}
         </div>
-        {status === 'loading' && <div className="catalog-message">Finding your next favorite<span className="loading-dots">...</span></div>}
-        {status === 'error' && <div className="catalog-message error-message">We couldn’t reach the shop just now. Check your connection and refresh to try again.</div>}
-        {status === 'ready' && visibleProducts.length > 0 && <div className="product-grid">{visibleProducts.map((product) => <ProductCard key={product.id} product={product} onAdd={onAdd} onQuickView={setQuickProduct} reviews={reviews[product.id] || []} stock={stock} />)}</div>}
-        {status === 'ready' && visibleProducts.length === 0 && <div className="catalog-message">No products match your search.</div>}
-      </section>
-      {quickProduct && (
-        <dialog className="quick-view-modal" ref={quickViewRef} onCancel={(event) => {
-          event.preventDefault()
-          quickViewRef.current?.close()
-        }} onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            event.preventDefault()
-            quickViewRef.current?.close()
-          }
-        }} onClose={() => setQuickProduct(null)} onClick={(event) => {
-          if (event.target === quickViewRef.current) quickViewRef.current.close()
-        }}>
-          <div className="quick-view-content">
-            <button className="icon-button modal-close" type="button" aria-label="Close product details" onClick={() => quickViewRef.current?.close()}><X size={19} /></button>
-            <div className="quick-view-image"><ProductImage src={quickProduct.images?.[0]} alt={quickProduct.title} /></div>
-            <div className="quick-view-copy">
-              <p className="eyebrow">{quickProduct.category?.name || 'Everyday find'}</p>
-              <h2>{quickProduct.title}</h2>
-              <TopRatedBadge reviews={reviews[quickProduct.id] || []} />
-              <RatingSummary reviews={reviews[quickProduct.id] || []} />
-              <StockIndicator product={quickProduct} stock={stock} />
-              <p className="quick-view-price">{formatPrice(quickProduct.price)}</p>
-              <p>{quickProduct.description}</p>
-              <div className="quick-view-actions">
-                <button className="primary-button" type="button" onClick={() => onAdd(quickProduct)}>Add to bag <span aria-hidden="true">+</span></button>
-                <Link className="text-link" to={`/products/${quickProduct.id}`} onClick={() => quickViewRef.current?.close()}>Full details <span aria-hidden="true">↗</span></Link>
-              </div>
-            </div>
+
+        {status === 'loading' ? (
+          <div className="catalog-message">Loading authentic collection<span className="loading-dots">...</span></div>
+        ) : products.length > 0 ? (
+          <div className="product-grid">
+            {products.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                onAdd={onAdd}
+                onQuickView={onQuickView}
+              />
+            ))}
           </div>
-        </dialog>
-      )}
+        ) : (
+          <div className="catalog-message">No items match your search. Try adjusting keywords.</div>
+        )}
+      </section>
     </main>
-  )
+  );
 }
 
-function ProductPage({ onAdd, reviews, onAddReview, stock }) {
-  const { id } = useParams()
-  const [product, setProduct] = useState(null)
-  const [status, setStatus] = useState('loading')
+function ProductPage({ onAdd, onNotify }) {
+  const { id } = useParams();
+  const [product, setProduct] = useState(null);
+  const [status, setStatus] = useState('loading');
+  const [selectedImage, setSelectedImage] = useState(0);
+  const [quantity, setQuantity] = useState(1);
+  const [reviews, setReviews] = useState([]);
+  const [newRating, setNewRating] = useState('5');
+  const [newComment, setNewComment] = useState('');
+  const [reviewerName, setReviewerName] = useState('');
 
   useEffect(() => {
-    let active = true
-    fetch(`${API_BASE}/products/${id}`).then((response) => {
-      if (!response.ok) throw new Error('Product could not be loaded')
-      return response.json()
-    }).then((data) => {
-      if (active) { setProduct(data); setStatus('ready') }
-    }).catch(() => { if (active) setStatus('error') })
-    return () => { active = false }
-  }, [id])
+    let active = true;
+    api.getProductById(id)
+      .then((data) => {
+        if (!active) return;
+        setProduct(data);
+        setReviews(api.getReviews(data.id));
+        setStatus('ready');
+      })
+      .catch(() => {
+        if (active) setStatus('error');
+      });
+    return () => { active = false; };
+  }, [id]);
 
-  if (status === 'loading') return <main className="route-message">Loading this good thing...</main>
-  if (status === 'error' || !product) return <main className="route-message">That product isn’t available right now. <Link to="/">Back to the shop</Link></main>
+  async function handleAddReview(e) {
+    e.preventDefault();
+    if (!newComment.trim()) return;
+    try {
+      const savedReview = await api.submitReview({
+        productId: product.id,
+        rating: Number(newRating),
+        comment: newComment.trim(),
+        author: reviewerName.trim() || 'Verified Shopper',
+      });
+      setReviews((cur) => [savedReview, ...cur]);
+      setNewComment('');
+      setReviewerName('');
+      onNotify('Thank you! Your review has been published.');
+    } catch {
+      onNotify('Could not submit review. Please try again.');
+    }
+  }
+
+  if (status === 'loading') {
+    return <main className="route-message">Loading product details...</main>;
+  }
+
+  if (status === 'error' || !product) {
+    return (
+      <main className="route-message">
+        Product not found or unavailable. <Link to="/">Return to catalog</Link>
+      </main>
+    );
+  }
+
+  const isOutOfStock = product.stock <= 0;
 
   return (
     <main className="product-page">
       <section className="detail-layout section-wrap">
-      <div className="detail-image"><ProductImage src={product.images?.[0]} alt={product.title} /></div>
-      <div className="detail-copy">
-        <Link className="back-link" to="/">← Back to the edit</Link>
-        <p className="eyebrow">{product.category?.name || 'Everyday object'}</p>
-        <h1>{product.title}</h1>
-        <TopRatedBadge reviews={reviews[product.id] || []} />
-        <StockIndicator product={product} stock={stock} />
-        <p className="detail-price">{formatPrice(product.price)}</p>
-        <p className="detail-description">{product.description}</p>
-        <button className="primary-button detail-add" type="button" onClick={() => onAdd(product)}>Add to bag <span aria-hidden="true">↗</span></button>
-        <p className="detail-footnote">A considered pick for your everyday. Delivery details are confirmed at checkout.</p>
-      </div>
+        {/* Images */}
+        <div className="detail-gallery space-y-3">
+          <div className="detail-image border border-[#eadde8] rounded-2xl overflow-hidden bg-white shadow-xs">
+            <ProductImage
+              src={product.images?.[selectedImage] || product.images?.[0]}
+              alt={product.name}
+            />
+          </div>
+          {product.images?.length > 1 && (
+            <div className="flex gap-2">
+              {product.images.map((img, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setSelectedImage(idx)}
+                  className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition ${
+                    selectedImage === idx ? 'border-[#e6388c]' : 'border-transparent opacity-70 hover:opacity-100'
+                  }`}
+                >
+                  <img src={img} alt="" className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Copy & Actions */}
+        <div className="detail-copy">
+          <Link className="back-link" to="/">← Back to the edit</Link>
+          <p className="eyebrow">{product.category?.name || 'Everyday object'}</p>
+          <h1>{product.name}</h1>
+          <div className="flex items-center gap-3 pt-1">
+            <RatingSummary rating={product.rating} reviewCount={product.reviewCount || reviews.length} />
+            <StockIndicator stock={product.stock} />
+          </div>
+
+          <div className="flex items-baseline gap-3 pt-2">
+            <p className="detail-price text-2xl font-bold text-[#e6388c]">
+              {formatPrice(product.price)}
+            </p>
+            {product.compareAtPrice && (
+              <span className="text-sm text-slate-400 line-through">
+                {formatPrice(product.compareAtPrice)}
+              </span>
+            )}
+          </div>
+
+          <p className="detail-description">{product.description}</p>
+
+          <div className="flex items-center gap-4 pt-2">
+            <label className="flex items-center gap-2 text-xs font-semibold text-[#35104f]">
+              Quantity:
+              <select
+                value={quantity}
+                onChange={(e) => setQuantity(Number(e.target.value))}
+                className="px-2.5 py-1.5 border rounded-lg bg-white"
+              >
+                {[1, 2, 3, 4, 5].map((q) => (
+                  <option key={q} value={q}>{q}</option>
+                ))}
+              </select>
+            </label>
+            <button
+              className={`primary-button detail-add ${isOutOfStock ? 'opacity-50 cursor-not-allowed' : ''}`}
+              type="button"
+              disabled={isOutOfStock}
+              onClick={() => onAdd(product, quantity)}
+            >
+              {isOutOfStock ? 'Out of stock' : `Add ${quantity} to Bag`} <span aria-hidden="true">↗</span>
+            </button>
+          </div>
+
+          <div className="pt-4 border-t border-[#eadde8] text-xs text-slate-500 space-y-1">
+            <p>✓ SKU: <span className="font-mono">{product.sku || 'RH-PROD'}</span></p>
+            <p>✓ Available for Cash on Delivery, bKash, and Card payments.</p>
+            <p>✓ Express delivery inside Dhaka: 24 to 48 hours.</p>
+          </div>
+        </div>
       </section>
-      <ProductReviews productId={product.id} reviews={reviews[product.id] || []} onAddReview={onAddReview} />
+
+      {/* Reviews Section */}
+      <section className="reviews-section section-wrap">
+        <div className="reviews-heading">
+          <div>
+            <p className="eyebrow">Customer Feedback</p>
+            <h2>Ratings &amp; Reviews</h2>
+          </div>
+          <RatingSummary rating={product.rating} reviewCount={reviews.length} />
+        </div>
+
+        {/* Add Review Form */}
+        <form className="review-form" onSubmit={handleAddReview}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label>
+              Your Name
+              <input
+                type="text"
+                value={reviewerName}
+                onChange={(e) => setReviewerName(e.target.value)}
+                placeholder="e.g. Farhana S."
+              />
+            </label>
+            <label>
+              Rating
+              <select value={newRating} onChange={(e) => setNewRating(e.target.value)}>
+                <option value="5">★★★★★ (5 Stars - Excellent)</option>
+                <option value="4">★★★★☆ (4 Stars - Very Good)</option>
+                <option value="3">★★★☆☆ (3 Stars - Average)</option>
+                <option value="2">★★☆☆☆ (2 Stars - Below Average)</option>
+                <option value="1">★☆☆☆☆ (1 Star - Poor)</option>
+              </select>
+            </label>
+          </div>
+          <label className="review-comment">
+            Your Review
+            <textarea
+              required
+              rows={3}
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="What did you love most about this product?"
+            />
+          </label>
+          <button className="primary-button" type="submit">
+            Submit Review <span aria-hidden="true">↗</span>
+          </button>
+        </form>
+
+        {/* Existing reviews */}
+        <div className="review-list">
+          {reviews.length === 0 ? (
+            <p className="empty-reviews">No reviews posted yet. Be the first to share your thoughts!</p>
+          ) : (
+            reviews.map((rev) => (
+              <article className="review-entry" key={rev.id}>
+                <div className="review-entry-heading">
+                  <strong>{rev.author}</strong>
+                  <span>{new Date(rev.createdAt).toLocaleDateString()}</span>
+                </div>
+                <div className="flex items-center gap-1 text-amber-500 text-xs">
+                  {'★'.repeat(rev.rating)}
+                  {'☆'.repeat(5 - rev.rating)}
+                </div>
+                <p>{rev.comment}</p>
+              </article>
+            ))
+          )}
+        </div>
+      </section>
     </main>
-  )
+  );
 }
 
-function ProductReviews({ productId, reviews, onAddReview }) {
-  const [rating, setRating] = useState('5')
-  const [comment, setComment] = useState('')
-  const [message, setMessage] = useState('')
-
-  function handleSubmit(event) {
-    event.preventDefault()
-    const trimmedComment = comment.trim()
-    if (!trimmedComment) return
-    onAddReview(productId, { rating: Number(rating), comment: trimmedComment })
-    setComment('')
-    setMessage('Your review has been saved in this browser.')
-  }
-
-  return (
-    <section className="reviews-section section-wrap" aria-labelledby="reviews-title">
-      <div className="reviews-heading">
-        <div><p className="eyebrow">From the community</p><h2 id="reviews-title">Ratings &amp; comments</h2></div>
-        <RatingSummary reviews={reviews} />
-      </div>
-      <form className="review-form" onSubmit={handleSubmit}>
-        <label>Rating<select value={rating} onChange={(event) => setRating(event.target.value)}>{[5, 4, 3, 2, 1].map((value) => <option key={value} value={value}>{value} {value === 1 ? 'star' : 'stars'}</option>)}</select></label>
-        <label className="review-comment">Your comment<textarea required minLength={5} maxLength={600} value={comment} onChange={(event) => setComment(event.target.value)} placeholder="What did you think of this product?" /></label>
-        <button className="primary-button" type="submit">Post review <span aria-hidden="true">↗</span></button>
-        {message && <p className="review-feedback" role="status">{message}</p>}
-      </form>
-      <div className="review-list">
-        {reviews.length === 0 ? <p className="empty-reviews">No reviews yet. Be the first to share a thought.</p> : [...reviews].reverse().map((review) => (
-          <article className="review-entry" key={review.id}>
-            <div className="review-entry-heading"><strong>{review.author || 'Shopper'}</strong><span>{new Date(review.createdAt).toLocaleDateString()}</span></div>
-            <RatingSummary reviews={[review]} />
-            <p>{review.comment}</p>
-          </article>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-function CartPage({ cart, onQuantity, onRemove, onCheckout }) {
-  const navigate = useNavigate()
-  const items = Object.values(cart)
-  const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
+function CartPage({ cart, onQuantity, onRemove, onOpenCheckout }) {
+  const navigate = useNavigate();
+  const items = Object.values(cart);
+  const subtotal = items.reduce((sum, item) => sum + (item.product.price || 0) * item.quantity, 0);
 
   return (
     <main className="cart-page section-wrap">
-      <div className="section-heading cart-heading"><div><p className="eyebrow">Your good things</p><h1>Your bag<span className="title-period">.</span></h1></div><span>{items.reduce((sum, item) => sum + item.quantity, 0)} items</span></div>
+      <div className="section-heading cart-heading">
+        <div>
+          <p className="eyebrow">Your Selection</p>
+          <h1>Shopping Bag<span className="title-period">.</span></h1>
+        </div>
+        <span>{items.reduce((sum, i) => sum + i.quantity, 0)} items</span>
+      </div>
+
       {items.length === 0 ? (
-        <div className="empty-cart"><p>Your bag is taking a little breather.</p><Link className="primary-button" to="/">Find something lovely <span aria-hidden="true">↗</span></Link></div>
+        <div className="empty-cart">
+          <p>Your shopping bag is currently empty.</p>
+          <Link className="primary-button" to="/">
+            Explore Products <span aria-hidden="true">↗</span>
+          </Link>
+        </div>
       ) : (
         <div className="cart-layout">
-          <div className="cart-items">{items.map(({ product, quantity }) => (
-            <article className="cart-item" key={product.id}>
-              <Link to={`/products/${product.id}`} className="cart-thumb"><ProductImage src={product.images?.[0]} alt={product.title} /></Link>
-              <div className="cart-item-info"><Link to={`/products/${product.id}`}><h2>{product.title}</h2></Link><span>{product.category?.name || 'Everyday'}</span><button className="text-button remove-button" type="button" onClick={() => onRemove(product.id)}>Remove</button></div>
-              <label className="quantity-control">Qty <select aria-label={`Quantity for ${product.title}`} value={quantity} onChange={(event) => onQuantity(product.id, Number(event.target.value))}>{[1, 2, 3, 4, 5, 6].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
-              <strong>{formatPrice(product.price * quantity)}</strong>
-            </article>
-          ))}</div>
-          <aside className="order-summary"><h2>Little recap</h2><div><span>Subtotal</span><strong>{formatPrice(subtotal)}</strong></div><div><span>Shipping</span><span>Calculated at checkout</span></div><p>Demo checkout saves this order to your browser history.</p><button className="primary-button checkout-button" type="button" onClick={onCheckout}>Place demo order <span aria-hidden="true">↗</span></button><button className="text-button continue-button" type="button" onClick={() => navigate('/')}>Keep browsing</button></aside>
+          <div className="cart-items">
+            {items.map(({ product, quantity }) => (
+              <article className="cart-item" key={product.id}>
+                <Link to={`/products/${product.id}`} className="cart-thumb">
+                  <ProductImage src={product.images?.[0]} alt={product.name} />
+                </Link>
+                <div className="cart-item-info">
+                  <Link to={`/products/${product.id}`}>
+                    <h2>{product.name}</h2>
+                  </Link>
+                  <span>{product.category?.name || 'Everyday'}</span>
+                  <button
+                    className="text-button remove-button"
+                    type="button"
+                    onClick={() => onRemove(product.id)}
+                  >
+                    Remove
+                  </button>
+                </div>
+                <label className="quantity-control">
+                  Qty
+                  <select
+                    value={quantity}
+                    onChange={(e) => onQuantity(product.id, Number(e.target.value))}
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((q) => (
+                      <option key={q} value={q}>{q}</option>
+                    ))}
+                  </select>
+                </label>
+                <strong>{formatPrice((product.price || 0) * quantity)}</strong>
+              </article>
+            ))}
+          </div>
+
+          <aside className="order-summary">
+            <h2>Order Summary</h2>
+            <div>
+              <span>Subtotal</span>
+              <strong>{formatPrice(subtotal)}</strong>
+            </div>
+            <div>
+              <span>Delivery</span>
+              <span>Calculated at checkout (৳60 / ৳120)</span>
+            </div>
+            <p className="text-xs text-slate-500">
+              Payment methods supported: bKash, Nagad, Visa, Mastercard, and Cash on Delivery.
+            </p>
+            <button
+              className="primary-button checkout-button"
+              type="button"
+              onClick={onOpenCheckout}
+            >
+              Proceed to Checkout <span aria-hidden="true">↗</span>
+            </button>
+            <button
+              className="text-button continue-button"
+              type="button"
+              onClick={() => navigate('/')}
+            >
+              Continue Shopping
+            </button>
+          </aside>
         </div>
       )}
     </main>
-  )
+  );
 }
 
 function AboutPage() {
@@ -452,20 +734,38 @@ function AboutPage() {
       <header className="brand-page-heading">
         <p className="eyebrow">About Rauhie Shop</p>
         <h1>Useful finds for<br /><em>every kind of day.</em></h1>
-        <p>Rauhie Shop brings together gadgets, toys, clothing, beauty, gifts, everyday essentials, and more.</p>
+        <p>Rauhie Shop curates refined jewelry, modest silk fashion, artisanal fragrances, handbags, smart gadgets, and memorable gifts.</p>
       </header>
-      <section className="about-values" aria-label="What we bring together">
-        <article><span>01</span><h2>Explore more</h2><p>Discover products across categories, with new finds to browse as the collection grows.</p></article>
-        <article><span>02</span><h2>Everyday useful</h2><p>From handy tech to home and lifestyle picks, find things that fit the way you live.</p></article>
-        <article><span>03</span><h2>Made for choice</h2><p>Compare different kinds of products in one shop and choose what works for you.</p></article>
+      <section className="about-values" aria-label="Values">
+        <article>
+          <span>01</span>
+          <h2>Thoughtful Quality</h2>
+          <p>Every piece is chosen with attention to materials, craftsmanship, and longevity.</p>
+        </article>
+        <article>
+          <span>02</span>
+          <h2>Direct Delivery</h2>
+          <p>Swift dispatch across Dhaka and nationwide courier fulfillment with tracking.</p>
+        </article>
+        <article>
+          <span>03</span>
+          <h2>Customer First</h2>
+          <p>Transparent pricing, authentic products, responsive helpline, and easy returns.</p>
+        </article>
       </section>
       <section className="about-location">
-        <div><p className="eyebrow">Find us in Dhaka</p><h2>Rauhie Shop</h2></div>
-        <address>21 Sukrabad, Dhanmondi 32,<br />Dhaka-1205</address>
+        <div>
+          <p className="eyebrow">Visit Our Showroom</p>
+          <h2>Rauhie Shop</h2>
+        </div>
+        <address>
+          21 Sukrabad, Dhanmondi 32,<br />
+          Dhaka-1205, Bangladesh
+        </address>
         <Link className="text-link" to="/contact">Get in touch <span aria-hidden="true">↗</span></Link>
       </section>
     </main>
-  )
+  );
 }
 
 function ContactPage() {
@@ -473,70 +773,69 @@ function ContactPage() {
     <main className="brand-page contact-page section-wrap">
       <header className="brand-page-heading">
         <p className="eyebrow">Contact Rauhie Shop</p>
-        <h1>We’re easy<br /><em>to reach.</em></h1>
-        <p>Questions about a product or your order? Reach out by phone or email, or find our address below.</p>
+        <h1>We’re always<br /><em>easy to reach.</em></h1>
+        <p>Reach out for product inquiries, wholesale requests, or delivery updates.</p>
       </header>
-      <section className="contact-details" aria-label="Contact details">
-        <a href="tel:+8801710659435"><span>Call us</span><strong>+88 01710659435</strong><span className="contact-arrow" aria-hidden="true">↗</span></a>
-        <a href="mailto:rakibchp@gmail.com"><span>Email us</span><strong>rakibchp@gmail.com</strong><span className="contact-arrow" aria-hidden="true">↗</span></a>
-        <a href="https://maps.google.com/?q=21+Sukrabad,+Dhanmondi+32,+Dhaka-1205" target="_blank" rel="noreferrer"><span>Visit us</span><strong>21 Sukrabad, Dhanmondi 32,<br />Dhaka-1205</strong><span className="contact-arrow" aria-hidden="true">↗</span></a>
+      <section className="contact-details" aria-label="Contact options">
+        <a href="tel:+8801710659435">
+          <span>Call or WhatsApp</span>
+          <strong>+88 01710659435</strong>
+          <span className="contact-arrow" aria-hidden="true">↗</span>
+        </a>
+        <a href="mailto:rakibchp@gmail.com">
+          <span>Email Support</span>
+          <strong>rakibchp@gmail.com</strong>
+          <span className="contact-arrow" aria-hidden="true">↗</span>
+        </a>
+        <a href="https://maps.google.com/?q=21+Sukrabad,+Dhanmondi+32,+Dhaka-1205" target="_blank" rel="noreferrer">
+          <span>Location</span>
+          <strong>21 Sukrabad, Dhanmondi 32, Dhaka</strong>
+          <span className="contact-arrow" aria-hidden="true">↗</span>
+        </a>
       </section>
     </main>
-  )
+  );
 }
 
 function AuthPage({ isRegister = false, session, onSignIn }) {
-  const location = useLocation()
-  const navigate = useNavigate()
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmation, setConfirmation] = useState('')
-  const [error, setError] = useState('')
-  const [pending, setPending] = useState(false)
-  const notice = location.state?.notice || ''
+  const navigate = useNavigate();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
+  const [error, setError] = useState('');
+  const [pending, setPending] = useState(false);
 
-  async function handleSubmit(event) {
-    event.preventDefault()
-    setError('')
-    if (isRegister && password !== confirmation) {
-      setError('Your passwords do not match.')
-      return
-    }
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError('');
+    setPending(true);
 
-    setPending(true)
     try {
       if (isRegister) {
-        const response = await fetch(`${API_BASE}/users`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, password, avatar: 'https://i.pravatar.cc/300' }),
-        })
-        const result = await response.json().catch(() => ({}))
-        if (!response.ok) throw new Error(Array.isArray(result.message) ? result.message.join(', ') : result.message || 'Could not create your account.')
-        navigate('/login', { replace: true, state: { notice: 'Your account is ready. Sign in to continue.' } })
+        const res = await api.register({ name, email, password, phone });
+        onSignIn(res);
+        navigate('/account', { replace: true });
       } else {
-        const response = await fetch(`${API_BASE}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        })
-        const tokens = await response.json().catch(() => ({}))
-        if (!response.ok) throw new Error(Array.isArray(tokens.message) ? tokens.message.join(', ') : tokens.message || 'Email or password was not accepted.')
-        const profileResponse = await fetch(`${API_BASE}/auth/profile`, { headers: { Authorization: `Bearer ${tokens.access_token}` } })
-        const user = profileResponse.ok ? await profileResponse.json() : { email, name: email.split('@')[0] }
-        onSignIn({ ...tokens, user })
-        navigate('/account', { replace: true })
+        const res = await api.login(email, password);
+        onSignIn(res);
+        navigate('/account', { replace: true });
       }
-    } catch (requestError) {
-      setError(requestError.message || 'Something went wrong. Please try again.')
+    } catch (err) {
+      setError(err.message || 'Authentication failed. Please check credentials.');
     } finally {
-      setPending(false)
+      setPending(false);
     }
   }
 
   if (session) {
-    return <main className="account-page section-wrap"><p className="eyebrow">Rauhie Shop account</p><h1>You’re already signed in.</h1><Link className="primary-button" to="/account">Go to your account <span aria-hidden="true">↗</span></Link></main>
+    return (
+      <main className="account-page section-wrap">
+        <p className="eyebrow">Account</p>
+        <h1>You are signed in as {session.user?.name || session.user?.email}.</h1>
+        <Link className="primary-button" to="/account">View Account <span aria-hidden="true">↗</span></Link>
+      </main>
+    );
   }
 
   return (
@@ -544,190 +843,440 @@ function AuthPage({ isRegister = false, session, onSignIn }) {
       <div className="account-form-wrap">
         <p className="eyebrow">{isRegister ? 'Join Rauhie Shop' : 'Welcome back'}</p>
         <h1>{isRegister ? 'Create your account.' : 'Sign in.'}</h1>
-        <p className="account-intro">{isRegister ? 'Create an account to keep your shopping in one place.' : 'Sign in to access your account.'}</p>
-        {notice && <p className="form-notice" role="status">{notice}</p>}
+        <p className="account-intro">
+          {isRegister ? 'Register to track orders and save your delivery addresses.' : 'Sign in to access your profile and order history.'}
+        </p>
+
         {error && <p className="form-error" role="alert">{error}</p>}
+
         <form className="account-form" onSubmit={handleSubmit}>
-          {isRegister && <label>Full name<input autoComplete="name" minLength={2} required value={name} onChange={(event) => setName(event.target.value)} /></label>}
-          <label>Email address<input autoComplete="email" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label>
-          <label>Password<input autoComplete={isRegister ? 'new-password' : 'current-password'} type="password" minLength={8} required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-          {isRegister && <label>Confirm password<input autoComplete="new-password" type="password" minLength={8} required value={confirmation} onChange={(event) => setConfirmation(event.target.value)} /></label>}
-          <button className="primary-button" type="submit" disabled={pending}>{pending ? 'Please wait...' : isRegister ? 'Create account' : 'Sign in'} <span aria-hidden="true">↗</span></button>
+          {isRegister && (
+            <>
+              <label>
+                Full Name
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Ayesha Rahman"
+                />
+              </label>
+              <label>
+                Phone Number
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+8801710659435"
+                />
+              </label>
+            </>
+          )}
+
+          <label>
+            Email Address
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@example.com"
+            />
+          </label>
+
+          <label>
+            Password
+            <input
+              type="password"
+              required
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+            />
+          </label>
+
+          <button className="primary-button" type="submit" disabled={pending}>
+            {pending ? 'Verifying...' : isRegister ? 'Create Account' : 'Sign In'} <span aria-hidden="true">↗</span>
+          </button>
         </form>
-        <p className="auth-switch">{isRegister ? 'Already have an account?' : 'New to Rauhie Shop?'} <Link to={isRegister ? '/login' : '/register'}>{isRegister ? 'Sign in' : 'Create an account'}</Link></p>
+
+        <div className="pt-4 border-t mt-4 text-xs text-slate-500">
+          <p>
+            {isRegister ? 'Already registered?' : 'New shopper?'}{' '}
+            <Link to={isRegister ? '/login' : '/register'} className="text-[#e6388c] font-semibold">
+              {isRegister ? 'Sign In' : 'Create an Account'}
+            </Link>
+          </p>
+          <div className="mt-3 p-3 bg-pink-50 rounded-xl border border-pink-200">
+            <span className="font-bold text-[#35104f]">SuperAdmin Credentials:</span>
+            <div className="font-mono text-[11px] text-slate-600 mt-0.5">
+              Email: <strong>admin@rauhie.com</strong><br />
+              Password: <strong>Admin@Rauhie2026</strong>
+            </div>
+          </div>
+        </div>
       </div>
     </main>
-  )
+  );
 }
 
 function AccountPage({ session, onSignOut }) {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
   if (!session) {
-    return <main className="account-page section-wrap"><p className="eyebrow">Rauhie Shop account</p><h1>Sign in to your account.</h1><Link className="primary-button" to="/login">Sign in <span aria-hidden="true">↗</span></Link></main>
+    return (
+      <main className="account-page section-wrap">
+        <p className="eyebrow">Rauhie Shop Account</p>
+        <h1>Sign in to your account.</h1>
+        <Link className="primary-button" to="/login">Sign In <span aria-hidden="true">↗</span></Link>
+      </main>
+    );
   }
 
-  const user = session.user || {}
+  const user = session.user || {};
+  const isAdmin = user.role === 'ADMIN';
+
   return (
     <main className="account-page section-wrap">
-      <p className="eyebrow">Your Rauhie Shop account</p>
-      <h1>Welcome, {user.name || 'shopper'}.</h1>
+      <p className="eyebrow">Your Profile</p>
+      <h1>Welcome back, {user.name || 'Shopper'}.</h1>
       <p className="account-intro">{user.email}</p>
-      <div className="account-profile">
-        {user.avatar && <img className="profile-avatar" src={user.avatar} alt={`${user.name || 'Account'} profile`} />}
-        <div><span className="profile-label">Account role</span><strong className={`role-badge ${user.role === 'admin' ? 'admin-role' : ''}`}>{user.role || 'customer'}</strong></div>
-      </div>
-      <div className="account-actions">
-        <Link className="account-action-link" to="/history"><HistoryIcon size={19} aria-hidden="true" />Order history <span aria-hidden="true">↗</span></Link>
-        {user.role === 'admin' && <Link className="account-action-link" to="/admin/products">Manage products <span aria-hidden="true">↗</span></Link>}
-        <button className="text-button sign-out-button" type="button" onClick={() => { onSignOut(); navigate('/') }}><LogOut size={17} aria-hidden="true" />Sign out</button>
-      </div>
-    </main>
-  )
-}
 
-function OrderHistoryPage({ orders }) {
-  return (
-    <main className="history-page section-wrap">
-      <div className="section-heading"><div><p className="eyebrow">Saved on this device</p><h1>Order history<span className="title-period">.</span></h1></div><span>{orders.length} orders</span></div>
-      {orders.length === 0 ? (
-        <div className="empty-cart"><p>No demo orders yet.</p><Link className="primary-button" to="/">Browse products <span aria-hidden="true">↗</span></Link></div>
-      ) : (
-        <div className="order-history-list">{orders.map((order) => (
-          <article className="order-history-item" key={order.id}>
-            <header><div><span>Order</span><h2>{order.id}</h2></div><time dateTime={order.createdAt}>{new Date(order.createdAt).toLocaleDateString()}</time></header>
-            <ul>{order.items.map((item) => <li key={item.id}><span>{item.quantity} × {item.title}</span><strong>{formatPrice(item.price * item.quantity)}</strong></li>)}</ul>
-            <footer><span>Demo order</span><strong>Total {formatPrice(order.total)}</strong></footer>
-          </article>
-        ))}</div>
-      )}
+      <div className="account-profile">
+        <div>
+          <span className="profile-label">Account Role</span>
+          <strong className={`role-badge ${isAdmin ? 'admin-role' : ''}`}>
+            {user.role || 'CUSTOMER'}
+          </strong>
+        </div>
+      </div>
+
+      <div className="account-actions">
+        <Link className="account-action-link" to="/history">
+          <HistoryIcon size={19} aria-hidden="true" />
+          <span>Order History &amp; Tracking</span> <span aria-hidden="true">↗</span>
+        </Link>
+        {isAdmin && (
+          <Link className="account-action-link text-[#e6388c] font-bold" to="/admin">
+            <span>★ SuperAdmin Dashboard</span> <span aria-hidden="true">↗</span>
+          </Link>
+        )}
+        <button
+          className="text-button sign-out-button"
+          type="button"
+          onClick={() => {
+            onSignOut();
+            navigate('/');
+          }}
+        >
+          <LogOut size={17} aria-hidden="true" />
+          <span>Sign Out</span>
+        </button>
+      </div>
     </main>
-  )
+  );
 }
 
 function BackToTop() {
-  const [isVisible, setIsVisible] = useState(false)
+  const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    const updateVisibility = () => setIsVisible(window.scrollY > 320)
+    const handleScroll = () => setIsVisible(window.scrollY > 300);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
-    updateVisibility()
-    window.addEventListener('scroll', updateVisibility, { passive: true })
-    return () => window.removeEventListener('scroll', updateVisibility)
-  }, [])
-
-  if (!isVisible) return null
-
-  function scrollToTop() {
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const accessibilityReducedMotion = document.documentElement.classList.contains('a11y-reduced-motion')
-    const behavior = prefersReducedMotion || accessibilityReducedMotion ? 'instant' : 'smooth'
-    window.scrollTo({ top: 0, behavior })
-  }
+  if (!isVisible) return null;
 
   return (
     <button
-      className="fixed bottom-4 right-4 z-50 grid size-12 place-items-center rounded-full bg-[#35104f] text-2xl text-white shadow-lg transition duration-200 ease-out hover:-translate-y-1 hover:bg-[#e6388c] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e6388c] motion-reduce:transition-none sm:bottom-6 sm:right-6"
+      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
       type="button"
+      className="fixed bottom-6 right-6 z-40 p-3 rounded-full bg-[#35104f] text-white shadow-xl hover:bg-[#e6388c] transition duration-200"
       aria-label="Back to top"
-      title="Back to top"
-      onClick={scrollToTop}
     >
-      <span aria-hidden="true">↑</span>
+      ↑
     </button>
-  )
+  );
 }
 
-function App() {
-  const [cart, setCart] = useState(readSavedCart)
-  const [reviews, setReviews] = useState(readSavedReviews)
-  const [session, setSession] = useState(readSavedSession)
-  const [orders, setOrders] = useState(readSavedOrders)
-  const [stock, setStock] = useState(readSavedStock)
-  const itemCount = useMemo(() => Object.values(cart).reduce((sum, item) => sum + item.quantity, 0), [cart])
-  const navigate = useNavigate()
+export default function App() {
+  const [cart, setCart] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('rauhie_cart_v2') || '{}');
+    } catch {
+      return {};
+    }
+  });
 
-  useEffect(() => { localStorage.setItem('shop-cart', JSON.stringify(cart)) }, [cart])
-  useEffect(() => { localStorage.setItem('shop-product-reviews', JSON.stringify(reviews)) }, [reviews])
+  const [session, setSession] = useState(() => api.getSession());
+  const [orders, setOrders] = useState([]);
+  const [toastMessage, setToastMessage] = useState('');
+  const [quickProduct, setQuickProduct] = useState(null);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+
+  const itemCount = useMemo(
+    () => Object.values(cart).reduce((sum, item) => sum + item.quantity, 0),
+    [cart]
+  );
+
   useEffect(() => {
-    if (session) localStorage.setItem('shop-session', JSON.stringify(session))
-    else localStorage.removeItem('shop-session')
-  }, [session])
-  useEffect(() => { localStorage.setItem('shop-order-history', JSON.stringify(orders)) }, [orders])
-  useEffect(() => { localStorage.setItem('shop-product-stock', JSON.stringify(stock)) }, [stock])
+    localStorage.setItem('rauhie_cart_v2', JSON.stringify(cart));
+  }, [cart]);
 
-  function addToCart(product) {
-    setCart((current) => ({
-      ...current,
-      [product.id]: { product, quantity: (current[product.id]?.quantity || 0) + 1 },
-    }))
+  useEffect(() => {
+    api.getOrders(session?.token).then(setOrders);
+  }, [session]);
+
+  function showToast(msg) {
+    setToastMessage(msg);
+  }
+
+  function addToCart(product, qty = 1) {
+    if (product.stock <= 0) {
+      showToast('Sorry, this product is sold out.');
+      return;
+    }
+    setCart((current) => {
+      const existing = current[product.id]?.quantity || 0;
+      const nextQuantity = Math.min(product.stock, existing + qty);
+      return {
+        ...current,
+        [product.id]: { product, quantity: nextQuantity },
+      };
+    });
+    showToast(`Added "${product.name}" to your bag!`);
   }
 
   function updateQuantity(productId, quantity) {
-    setCart((current) => ({ ...current, [productId]: { ...current[productId], quantity } }))
+    setCart((current) => ({
+      ...current,
+      [productId]: { ...current[productId], quantity },
+    }));
   }
 
   function removeFromCart(productId) {
-    setCart((current) => Object.fromEntries(Object.entries(current).filter(([id]) => id !== String(productId))))
+    setCart((current) => {
+      const next = { ...current };
+      delete next[productId];
+      return next;
+    });
+    showToast('Item removed from bag');
   }
 
-  function updateProductStock(productId, quantity) {
-    setStock((current) => {
-      const next = { ...current }
-      if (quantity == null) delete next[productId]
-      else next[productId] = quantity
-      return next
-    })
+  function clearCart() {
+    setCart({});
   }
 
-  function addReview(productId, review) {
-    const savedReview = { ...review, id: Date.now(), author: 'Shopper', createdAt: new Date().toISOString() }
-    setReviews((current) => ({
-      ...current,
-      [productId]: [...(current[productId] || []), savedReview],
-    }))
+  async function handleOrderSuccess(orderPayload) {
+    const placedOrder = await api.placeOrder(orderPayload, session?.token);
+    setOrders((current) => [placedOrder, ...current]);
+    clearCart();
+    showToast(`Order ${placedOrder.orderNumber} placed successfully!`);
+    return placedOrder;
   }
 
-  function signOut() {
-    setSession(null)
+  function handleReorder(pastOrder) {
+    pastOrder.items?.forEach((item) => {
+      api.getProductById(item.productId).then((prod) => {
+        if (prod) addToCart(prod, item.quantity);
+      }).catch(() => {});
+    });
+    showToast('Items from previous order added to your bag!');
   }
 
-  function placeDemoOrder() {
-    const items = Object.values(cart)
-    if (items.length === 0) return
-    const order = {
-      id: `RS-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      items: items.map(({ product, quantity }) => ({ id: product.id, title: product.title, price: product.price, quantity })),
-      total: items.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
-    }
-    setOrders((current) => [order, ...current])
-    setCart({})
-    navigate('/history')
+  function handleAuthenticateAdmin() {
+    api.login('admin@rauhie.com', 'Admin@Rauhie2026').then((sess) => {
+      setSession(sess);
+      showToast('Authenticated as SuperAdmin (admin@rauhie.com)');
+    });
   }
 
   return (
     <>
-    <div className="app-shell">
-      <div className="announcement">A little more joy in the everyday <span aria-hidden="true">✳</span> Delivery details at checkout</div>
-      <Header itemCount={itemCount} user={session?.user} />
-      <Routes>
-        <Route path="/" element={<HomePage onAdd={addToCart} reviews={reviews} stock={stock} />} />
-        <Route path="/products/:id" element={<ProductPage onAdd={addToCart} reviews={reviews} onAddReview={addReview} stock={stock} />} />
-        <Route path="/cart" element={<CartPage cart={cart} onQuantity={updateQuantity} onRemove={removeFromCart} onCheckout={placeDemoOrder} />} />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/contact" element={<ContactPage />} />
-        <Route path="/login" element={<AuthPage session={session} onSignIn={setSession} />} />
-        <Route path="/register" element={<AuthPage isRegister session={session} onSignIn={setSession} />} />
-        <Route path="/account" element={<AccountPage session={session} onSignOut={signOut} />} />
-        <Route path="/history" element={<OrderHistoryPage orders={orders} />} />
-        <Route path="/admin/products" element={<AdminProductsPage session={session} stock={stock} onStockChange={updateProductStock} formatPrice={formatPrice} />} />
-        <Route path="*" element={<main className="route-message">Page not found. <Link to="/">Back to the shop</Link></main>} />
-      </Routes>
-      <Footer />
-    </div>
-    <BackToTop />
-    </>
-  )
-}
+      <div className="app-shell">
+        {/* Top Announcement Bar */}
+        <div className="announcement">
+          A little more joy in the everyday <span aria-hidden="true">✳</span>
+          Special Launch: Use voucher code <strong>RAUHIE10</strong> for 10% off <span aria-hidden="true">✳</span>
+          Express delivery across Bangladesh
+        </div>
 
-export default App
+        <Header
+          itemCount={itemCount}
+          session={session}
+          onOpenAdmin={handleAuthenticateAdmin}
+        />
+
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <HomePage
+                onAdd={addToCart}
+                onQuickView={setQuickProduct}
+              />
+            }
+          />
+          <Route
+            path="/products/:id"
+            element={
+              <ProductPage
+                onAdd={addToCart}
+                onNotify={showToast}
+              />
+            }
+          />
+          <Route
+            path="/cart"
+            element={
+              <CartPage
+                cart={cart}
+                onQuantity={updateQuantity}
+                onRemove={removeFromCart}
+                onOpenCheckout={() => setIsCheckoutOpen(true)}
+              />
+            }
+          />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route
+            path="/login"
+            element={<AuthPage session={session} onSignIn={setSession} />}
+          />
+          <Route
+            path="/register"
+            element={<AuthPage isRegister session={session} onSignIn={setSession} />}
+          />
+          <Route
+            path="/account"
+            element={
+              <AccountPage
+                session={session}
+                onSignOut={() => {
+                  api.logout();
+                  setSession(null);
+                  showToast('Signed out of account');
+                }}
+              />
+            }
+          />
+          <Route
+            path="/history"
+            element={
+              <main className="history-page section-wrap">
+                <div className="section-heading">
+                  <div>
+                    <p className="eyebrow">Your Customer Orders</p>
+                    <h1>Order History &amp; Tracking<span className="title-period">.</span></h1>
+                  </div>
+                  <span>{orders.length} orders</span>
+                </div>
+                <OrderHistoryView orders={orders} onReorder={handleReorder} />
+              </main>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <SuperAdminDashboard
+                session={session}
+                onSignInAdmin={handleAuthenticateAdmin}
+              />
+            }
+          />
+          <Route
+            path="/admin/products"
+            element={
+              <SuperAdminDashboard
+                session={session}
+                onSignInAdmin={handleAuthenticateAdmin}
+              />
+            }
+          />
+          <Route
+            path="*"
+            element={
+              <main className="route-message">
+                Page not found. <Link to="/">Return to catalog</Link>
+              </main>
+            }
+          />
+        </Routes>
+
+        <Footer />
+      </div>
+
+      {/* Quick View Modal */}
+      {quickProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-[#eadde8] overflow-hidden p-6">
+            <button
+              onClick={() => setQuickProduct(null)}
+              type="button"
+              className="absolute top-4 right-4 p-1 rounded-full text-slate-400 hover:text-slate-800"
+            >
+              <X size={20} />
+            </button>
+            <div className="flex flex-col sm:flex-row gap-6">
+              <div className="w-full sm:w-1/2 h-56 rounded-xl overflow-hidden border">
+                <img
+                  src={quickProduct.images?.[0]}
+                  alt={quickProduct.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="w-full sm:w-1/2 space-y-2.5">
+                <span className="text-xs font-bold uppercase tracking-wider text-[#e6388c]">
+                  {quickProduct.category?.name || 'Item'}
+                </span>
+                <h3 className="text-lg font-serif font-bold text-[#35104f]">{quickProduct.name}</h3>
+                <div className="flex items-center gap-2">
+                  <StockIndicator stock={quickProduct.stock} />
+                </div>
+                <div className="text-xl font-bold text-[#e6388c]">
+                  {formatPrice(quickProduct.price)}
+                </div>
+                <p className="text-xs text-slate-600 line-clamp-3">{quickProduct.description}</p>
+                <div className="pt-2 flex gap-3">
+                  <button
+                    onClick={() => {
+                      addToCart(quickProduct);
+                      setQuickProduct(null);
+                    }}
+                    type="button"
+                    className="flex-1 py-2.5 bg-[#35104f] text-white text-xs font-semibold rounded-xl hover:bg-[#e6388c] transition"
+                  >
+                    Add to Bag +
+                  </button>
+                  <Link
+                    to={`/products/${quickProduct.id}`}
+                    onClick={() => setQuickProduct(null)}
+                    className="px-3 py-2.5 border rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                  >
+                    Details ↗
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Checkout Modal with Payment Gateways */}
+      <CheckoutModal
+        isOpen={isCheckoutOpen}
+        onClose={() => setIsCheckoutOpen(false)}
+        cart={cart}
+        user={session?.user}
+        onOrderSuccess={handleOrderSuccess}
+      />
+
+      {/* Global Toast Notification */}
+      <Toast message={toastMessage} onClose={() => setToastMessage('')} />
+
+      <BackToTop />
+    </>
+  );
+}
